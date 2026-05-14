@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #003c71;
+  --navy-deep: #002647;
+  --brand-red: #e1261c;
+}
+
+html,
+body {
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+/* Números tabulares por defecto donde aparezcan dentro de tablas */
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
