@@ -22,17 +22,17 @@ export function PackageMixChart({ data }: { data: MixRow[] }) {
         />
         <YAxis
           tick={{ fontSize: 11, fill: "#374151" }}
-          tickFormatter={(v: number) => v.toLocaleString()}
+          tickFormatter={(v: any) => Number(v).toLocaleString()}
         />
         <Tooltip
-          formatter={(value: number) => [value.toLocaleString() + " gal", "Volume"]}
+          formatter={(value: any) => [Number(value).toLocaleString() + " gal", "Volume"]}
           contentStyle={{ fontSize: 12, borderRadius: 2 }}
         />
         <Bar dataKey="gallons" fill="#003C71">
           <LabelList
             dataKey="gallons"
             position="top"
-            formatter={(v: number) => v.toLocaleString()}
+            formatter={(v: any) => Number(v).toLocaleString()}
             style={{ fontSize: 10, fill: "#003C71", fontWeight: 600 }}
           />
         </Bar>

@@ -19,7 +19,7 @@ export function YoYDriversChart({ data }: { data: DriverRow[] }) {
         <XAxis
           type="number"
           tick={{ fontSize: 11, fill: "#374151" }}
-          tickFormatter={(v: number) => "+" + v.toLocaleString()}
+          tickFormatter={(v: any) => "+" + Number(v).toLocaleString()}
         />
         <YAxis
           type="category"
@@ -28,14 +28,14 @@ export function YoYDriversChart({ data }: { data: DriverRow[] }) {
           width={90}
         />
         <Tooltip
-          formatter={(value: number) => ["+" + value.toLocaleString() + " gal", "Δ YoY"]}
+          formatter={(value: any) => ["+" + Number(value).toLocaleString() + " gal", "Δ YoY"]}
           contentStyle={{ fontSize: 12, borderRadius: 2 }}
         />
         <Bar dataKey="delta" fill="#003C71">
           <LabelList
             dataKey="delta"
             position="right"
-            formatter={(v: number) => "+" + v.toLocaleString()}
+            formatter={(v: any) => "+" + Number(v).toLocaleString()}
             style={{ fontSize: 11, fill: "#003C71", fontWeight: 600 }}
           />
         </Bar>

@@ -33,10 +33,10 @@ export function StackedTrendChart({
         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#374151" }} />
         <YAxis
           tick={{ fontSize: 11, fill: "#374151" }}
-          tickFormatter={(v: number) => v.toLocaleString()}
+          tickFormatter={(v: any) => Number(v).toLocaleString()}
         />
         <Tooltip
-          formatter={(value: number) => [value.toLocaleString() + " gal", ""]}
+          formatter={(value: any) => [Number(value).toLocaleString() + " gal", ""]}
           contentStyle={{ fontSize: 12, borderRadius: 2 }}
         />
         <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
