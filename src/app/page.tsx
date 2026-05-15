@@ -256,7 +256,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-gray-700 mb-4">
                 Top 3 heavy formats (Drum/Box/Pail Oil) drove{" "}
                 <span className="font-semibold text-navy">
-                  +{fmtNum(positiveDrivers.slice(0, 3).reduce((a, d) => a + d.delta, 0))} gal
+                  +{fmtNum(positiveDrivers.slice(0, 3).reduce((a, d) => a + d.delta_gallons, 0))} gal
                 </span>{" "}
                 of the YoY gain.
               </p>
