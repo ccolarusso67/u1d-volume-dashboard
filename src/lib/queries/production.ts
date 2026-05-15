@@ -55,20 +55,20 @@ export async function getProductionByLineForMonth(
   return query<ProductionMonthlyByLine>(
     `
     SELECT
-      period_year::int            AS period_year,
-      period_month::int           AS period_month,
-      line_key,
-      display_name,
-      parent_line,
-      gallons::float8             AS gallons,
-      pallets::float8             AS pallets,
-      working_days::int           AS working_days,
-      avg_daily_gallons::float8   AS avg_daily_gallons,
-      peak_daily_gallons::float8  AS peak_daily_gallons,
-      utilization_vs_target::float8 AS utilization_vs_target
+      mv.period_year::int              AS period_year,
+      mv.period_month::int             AS period_month,
+      mv.line_key,
+      mv.display_name,
+      mv.parent_line,
+      mv.gallons::float8               AS gallons,
+      mv.pallets::float8               AS pallets,
+      mv.working_days::int             AS working_days,
+      mv.avg_daily_gallons::float8     AS avg_daily_gallons,
+      mv.peak_daily_gallons::float8    AS peak_daily_gallons,
+      mv.utilization_vs_target::float8 AS utilization_vs_target
     FROM u1d_ops.mv_production_monthly mv
     JOIN u1d_ops.production_lines pl USING (line_key)
-    WHERE period_year = $1 AND period_month = $2
+    WHERE mv.period_year = $1 AND mv.period_month = $2
     ORDER BY pl.sort_order
   `,
     [year, month]
@@ -89,9 +89,9 @@ export type LatestProductionMonth = {
 export async function getLatestProductionMonth(): Promise<LatestProductionMonth | null> {
   return queryOne<LatestProductionMonth>(`
     SELECT
-      period_year::int    AS period_year,
-      period_month::int   AS period_month,
-      SUM(gallons)::float8 AS total_gallons,
+      period_year::int       AS period_year,
+      period_month::int      AS period_month,
+      SUM(gallons)::float8   AS total_gallons,
       MAX(working_days)::int AS working_days
     FROM u1d_ops.mv_production_monthly
     GROUP BY period_year, period_month
@@ -117,13 +117,13 @@ export type ReconciliationRow = {
 export async function getReconciliation(): Promise<ReconciliationRow[]> {
   return query<ReconciliationRow>(`
     SELECT
-      period_year::int                          AS period_year,
-      period_month::int                         AS period_month,
-      produced_gallons::float8                  AS produced_gallons,
-      billed_gallons::float8                    AS billed_gallons,
-      inventory_delta_gallons::float8           AS inventory_delta_gallons,
-      inventory_delta_pct::float8               AS inventory_delta_pct,
-      working_days::int                         AS working_days
+      period_year::int                AS period_year,
+      period_month::int               AS period_month,
+      produced_gallons::float8        AS produced_gallons,
+      billed_gallons::float8          AS billed_gallons,
+      inventory_delta_gallons::float8 AS inventory_delta_gallons,
+      inventory_delta_pct::float8     AS inventory_delta_pct,
+      working_days::int               AS working_days
     FROM u1d_ops.mv_volume_reconciliation
     ORDER BY period_year DESC, period_month DESC
   `);
