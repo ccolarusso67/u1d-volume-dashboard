@@ -1,23 +1,25 @@
 import { KPITile } from "@/components/kpi-tile";
 import { Nav } from "@/components/nav";
 import {
-  getLatestMonth,
-  getMonth,
-  getRecentMonths,
-  getCustomerYoYForMonth,
-  getPackageMixForMonth,
-  getPackageYoYForMonth,
-  getYTDComparison,
+  getLatestMonth, getMonth, getRecentMonths,
+  getCustomerYoYForMonth, getPackageMixForMonth,
+  getPackageYoYForMonth, getYTDComparison,
+  getMonthlyCategoryTrend,
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
+import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
+import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
+import { PackageMixChart } from "@/components/charts/PackageMixChart";
 
 export const dynamic = "force-dynamic";
 
+const CATEGORIES = ["Heavy Oil", "Light Oil", "Coolant", "WW", "DEF"];
+
 function ytdLabel(month: number): string {
-  if (month <= 3) return `YTD Q1`;
-  if (month <= 6) return `YTD H1`;
-  if (month <= 9) return `YTD Q3`;
-  return `YTD FY`;
+  if (month <= 3) return "YTD Q1";
+  if (month <= 6) return "YTD H1";
+  if (month <= 9) return "YTD Q3";
+  return "YTD FY";
 }
 
 export default async function DashboardPage() {
@@ -41,7 +43,7 @@ export default async function DashboardPage() {
     : { year: latest.period_year, month: latest.period_month - 1 };
   const yearAgo = { year: latest.period_year - 1, month: latest.period_month };
 
-  const [prevMonthData, yearAgoData, customers, packages, drivers, ytd, trend6m] =
+  const [prevMonthData, yearAgoData, customers, packages, drivers, ytd, trend6m, categoryTrend] =
     await Promise.all([
       getMonth(prevMonth.year, prevMonth.month),
       getMonth(yearAgo.year, yearAgo.month),
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
       getPackageYoYForMonth(latest.period_year, latest.period_month),
       getYTDComparison(latest.period_year, latest.period_month),
       getRecentMonths(6),
+      getMonthlyCategoryTrend(6),
     ]);
 
   const momPct = prevMonthData
@@ -61,14 +64,35 @@ export default async function DashboardPage() {
   const ultrachemShare = latest.total_gallons > 0
     ? latest.ultrachem_gallons / latest.total_gallons : 0;
 
-  // Top 5 positive + top 3 negative YoY drivers (by delta gallons)
-  const positiveDrivers = drivers
-    .filter(d => d.delta_gallons > 0)
-    .slice(0, 5);
+  const positiveDrivers = drivers.filter(d => d.delta_gallons > 0).slice(0, 6);
   const negativeDrivers = drivers
     .filter(d => d.delta_gallons < 0)
     .sort((a, b) => a.delta_gallons - b.delta_gallons)
     .slice(0, 3);
+
+  // Pivot category trend into recharts-friendly shape
+  const trendMonthKeys = Array.from(
+    new Set(categoryTrend.map(r => `${r.period_year}-${r.period_month}`))
+  ).sort();
+  const stackedData: StackedTrendRow[] = trendMonthKeys.map(key => {
+    const [y, m] = key.split("-").map(Number);
+    const monthRows = categoryTrend.filter(r => r.period_year === y && r.period_month === m);
+    const row: StackedTrendRow = { month: formatPeriod(y, m, "en") };
+    for (const cat of CATEGORIES) {
+      row[cat] = monthRows.find(r => r.category === cat)?.gallons ?? 0;
+    }
+    return row;
+  });
+  // Driver chart wants biggest at top => largest delta first
+  const driverData = positiveDrivers.map(d => ({
+    package: d.display_name,
+    delta: d.delta_gallons,
+  }));
+  // Package mix chart — top 7
+  const mixData = packages.slice(0, 7).map(p => ({
+    package: p.display_name,
+    gallons: p.gallons,
+  }));
 
   return (
     <main>
@@ -89,43 +113,44 @@ export default async function DashboardPage() {
       <div className="container mx-auto px-8 py-8 max-w-7xl">
         {/* 5 KPI tiles */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          <KPITile
-            label="Month Volume"
-            value={fmtNum(latest.total_gallons)}
-            subtitle="gallons billed"
-            accent="navy"
-          />
-          <KPITile
-            label="MoM Change"
-            value={fmtPct(momPct)}
-            subtitle={prevMonthData
-              ? `vs ${fmtNum(prevMonthData.total_gallons)} gal`
-              : "no prior month"}
-            accent={momPct !== null && momPct >= 0 ? "success" : "red"}
-          />
-          <KPITile
-            label="YoY Change"
-            value={fmtPct(yoyPct)}
-            subtitle={yearAgoData
-              ? `vs ${fmtNum(yearAgoData.total_gallons)} gal`
-              : "no prior year"}
-            accent={yoyPct !== null && yoyPct >= 0 ? "success" : "red"}
-          />
-          <KPITile
-            label="ULTRACHEM Share"
-            value={fmtPct(ultrachemShare, 1, false)}
-            subtitle="intercompany customer"
-            accent="navy"
-          />
-          <KPITile
-            label={ytdLabel(latest.period_month)}
-            value={fmtNum(ytd.current_ytd)}
+          <KPITile label="Month Volume" value={fmtNum(latest.total_gallons)}
+            subtitle="gallons billed" accent="navy" />
+          <KPITile label="MoM Change" value={fmtPct(momPct)}
+            subtitle={prevMonthData ? `vs ${fmtNum(prevMonthData.total_gallons)} gal` : "no prior month"}
+            accent={momPct !== null && momPct >= 0 ? "success" : "red"} />
+          <KPITile label="YoY Change" value={fmtPct(yoyPct)}
+            subtitle={yearAgoData ? `vs ${fmtNum(yearAgoData.total_gallons)} gal` : "no prior year"}
+            accent={yoyPct !== null && yoyPct >= 0 ? "success" : "red"} />
+          <KPITile label="ULTRACHEM Share" value={fmtPct(ultrachemShare, 1, false)}
+            subtitle="intercompany customer" accent="navy" />
+          <KPITile label={ytdLabel(latest.period_month)} value={fmtNum(ytd.current_ytd)}
             subtitle={ytd.delta_pct !== null
-              ? `${fmtPct(ytd.delta_pct)} vs ${fmtNum(ytd.prior_ytd)} prior`
-              : "no prior year data"}
-            accent={ytd.delta_pct !== null && ytd.delta_pct >= 0 ? "success" : "red"}
-          />
+              ? `${fmtPct(ytd.delta_pct)} vs ${fmtNum(ytd.prior_ytd)} prior` : "no prior year data"}
+            accent={ytd.delta_pct !== null && ytd.delta_pct >= 0 ? "success" : "red"} />
         </div>
+
+        {/* 6-Month Stacked Trend Chart */}
+        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+          <h2 className="font-heading text-xl font-bold text-navy mb-1">
+            6-Month Volume Trend
+          </h2>
+          <div className="text-xs text-gray-500 mb-4">
+            Stacked by package category · last 6 months
+          </div>
+          <StackedTrendChart data={stackedData} categories={CATEGORIES} />
+          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+            Monthly totals (gal):{" "}
+            {trend6m.slice().reverse().map((m, i) =>
+              <span key={i}>
+                {i > 0 && " · "}
+                <span className="font-semibold text-navy">
+                  {formatPeriod(m.period_year, m.period_month, "en")}
+                </span>{" "}
+                {fmtNum(m.total_gallons)}
+              </span>
+            )}
+          </div>
+        </section>
 
         {/* Customer Detail with YoY */}
         <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
@@ -145,26 +170,17 @@ export default async function DashboardPage() {
             </thead>
             <tbody>
               {customers.map(c => {
-                const pctOfMonth = latest.total_gallons > 0
-                  ? c.current_gallons / latest.total_gallons : 0;
-                const deltaCls = c.delta_gallons >= 0
-                  ? "text-emerald-700" : "text-[#E1261C]";
+                const pctOfMonth = latest.total_gallons > 0 ? c.current_gallons / latest.total_gallons : 0;
                 return (
                   <tr key={c.customer_key} className="border-b border-gray-100 last:border-b-0">
                     <td className="py-2 text-navy">
                       {c.display_name}
-                      {c.is_intercompany && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">
-                          intercomp.
-                        </span>
-                      )}
+                      {c.is_intercompany && <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">intercomp.</span>}
                     </td>
                     <td className="py-2 text-right text-gray-500">{fmtNum(c.prior_gallons)}</td>
                     <td className="py-2 text-right font-medium">{fmtNum(c.current_gallons)}</td>
-                    <td className={`py-2 text-right ${deltaCls}`}>
-                      {c.delta_gallons >= 0 ? "+" : ""}{fmtNum(c.delta_gallons)}
-                    </td>
-                    <td className={`py-2 text-right ${deltaCls}`}>{fmtPct(c.delta_pct)}</td>
+                    <td className="py-2 text-right tabular-nums">{c.delta_gallons >= 0 ? "+" : ""}{fmtNum(c.delta_gallons)}</td>
+                    <td className="py-2 text-right tabular-nums">{c.delta_pct !== null ? (c.delta_pct >= 0 ? "+" : "") + fmtPct(c.delta_pct, 1, false) : "—"}</td>
                     <td className="py-2 text-right text-gray-500">{fmtPct(pctOfMonth, 1, false)}</td>
                   </tr>
                 );
@@ -173,9 +189,7 @@ export default async function DashboardPage() {
                 <td className="py-2 text-navy">TOTAL</td>
                 <td className="py-2 text-right text-navy">{fmtNum(yearAgoData?.total_gallons ?? 0)}</td>
                 <td className="py-2 text-right text-navy">{fmtNum(latest.total_gallons)}</td>
-                <td className="py-2 text-right text-navy">
-                  +{fmtNum(latest.total_gallons - (yearAgoData?.total_gallons ?? 0))}
-                </td>
+                <td className="py-2 text-right text-navy">+{fmtNum(latest.total_gallons - (yearAgoData?.total_gallons ?? 0))}</td>
                 <td className="py-2 text-right text-navy">{fmtPct(yoyPct)}</td>
                 <td className="py-2 text-right text-navy">100.0%</td>
               </tr>
@@ -183,112 +197,89 @@ export default async function DashboardPage() {
           </table>
         </section>
 
-        {/* Package Mix + YoY Drivers side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <section className="bg-white border border-gray-200 rounded-sm p-6">
-            <h2 className="font-heading text-xl font-bold text-navy mb-1">Package Mix</h2>
-            <div className="text-xs text-gray-500 mb-4">
-              {formatPeriod(latest.period_year, latest.period_month)} · top categories
+        {/* Package Mix chart + table side by side */}
+        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+          <h2 className="font-heading text-xl font-bold text-navy mb-1">
+            Package Mix — {formatPeriod(latest.period_year, latest.period_month)}
+          </h2>
+          <div className="text-xs text-gray-500 mb-4">Top categories that explain 90%+ of the month</div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <PackageMixChart data={mixData} />
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                  <th className="text-left pb-2 font-medium">#</th>
-                  <th className="text-left pb-2 font-medium">Category</th>
-                  <th className="text-right pb-2 font-medium">Gallons</th>
-                  <th className="text-right pb-2 font-medium">% of Month</th>
-                </tr>
-              </thead>
-              <tbody>
-                {packages.slice(0, 10).map((p, i) => (
-                  <tr key={p.package_key} className="border-b border-gray-100 last:border-b-0">
-                    <td className="py-2 text-gray-400">{i + 1}</td>
-                    <td className="py-2 text-navy">{p.display_name}</td>
-                    <td className="py-2 text-right">{fmtNum(p.gallons)}</td>
-                    <td className="py-2 text-right text-gray-500">
-                      {fmtPct(p.pct_of_month, 1, false)}
+            <div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                    <th className="text-left pb-2 font-medium">#</th>
+                    <th className="text-left pb-2 font-medium">Category</th>
+                    <th className="text-right pb-2 font-medium">% Month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {packages.slice(0, 7).map((p, i) => (
+                    <tr key={p.package_key} className="border-b border-gray-100 last:border-b-0">
+                      <td className="py-1.5 text-gray-400">{i + 1}</td>
+                      <td className="py-1.5 text-navy">{p.display_name}</td>
+                      <td className="py-1.5 text-right text-gray-600">{fmtPct(p.pct_of_month, 1, false)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-navy font-semibold">
+                    <td></td>
+                    <td className="py-1.5 text-navy">Subtotal top 7</td>
+                    <td className="py-1.5 text-right text-navy">
+                      {fmtPct(packages.slice(0, 7).reduce((a, p) => a + p.pct_of_month, 0), 1, false)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="bg-white border border-gray-200 rounded-sm p-6">
-            <h2 className="font-heading text-xl font-bold text-navy mb-1">YoY Drivers</h2>
-            <div className="text-xs text-gray-500 mb-4">
-              {formatPeriod(latest.period_year, latest.period_month)} vs {formatPeriod(yearAgo.year, yearAgo.month)} · by package
+                </tbody>
+              </table>
             </div>
+          </div>
+        </section>
 
-            <div className="text-[11px] uppercase tracking-wider text-emerald-700 font-semibold mb-2">
-              Top Positive Drivers
+        {/* YoY Drivers chart + drags context */}
+        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+          <h2 className="font-heading text-xl font-bold text-navy mb-1">
+            YoY Drivers — by Package
+          </h2>
+          <div className="text-xs text-gray-500 mb-4">
+            {formatPeriod(latest.period_year, latest.period_month)} vs {formatPeriod(yearAgo.year, yearAgo.month)} · top positive movers
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <YoYDriversChart data={driverData} />
             </div>
-            <table className="w-full text-sm mb-5">
-              <tbody>
-                {positiveDrivers.map(d => (
-                  <tr key={d.package_key} className="border-b border-gray-100 last:border-b-0">
-                    <td className="py-2 text-navy">{d.display_name}</td>
-                    <td className="py-2 text-right font-medium text-emerald-700">
-                      +{fmtNum(d.delta_gallons)}
-                    </td>
-                    <td className="py-2 text-right text-emerald-700 w-20">
-                      {fmtPct(d.delta_pct)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {negativeDrivers.length > 0 && (
-              <>
-                <div className="text-[11px] uppercase tracking-wider text-[#E1261C] font-semibold mb-2">
-                  Watchlist (Negative)
-                </div>
-                <table className="w-full text-sm">
-                  <tbody>
-                    {negativeDrivers.map(d => (
-                      <tr key={d.package_key} className="border-b border-gray-100 last:border-b-0">
-                        <td className="py-2 text-navy">{d.display_name}</td>
-                        <td className="py-2 text-right font-medium text-[#E1261C]">
-                          {fmtNum(d.delta_gallons)}
-                        </td>
-                        <td className="py-2 text-right text-[#E1261C] w-20">
-                          {fmtPct(d.delta_pct)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </section>
-        </div>
-
-        {/* 6-month trend */}
-        <section className="bg-white border border-gray-200 rounded-sm p-6">
-          <h2 className="font-heading text-xl font-bold text-navy mb-1">6-Month Trend</h2>
-          <div className="text-xs text-gray-500 mb-4">last 6 loaded months</div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-2 font-medium">Period</th>
-                <th className="text-right pb-2 font-medium">Total</th>
-                <th className="text-right pb-2 font-medium">ULTRACHEM</th>
-                <th className="text-right pb-2 font-medium">External</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trend6m.slice().reverse().map(m => (
-                <tr key={`${m.period_year}-${m.period_month}`}
-                    className="border-b border-gray-100 last:border-b-0">
-                  <td className="py-2 text-navy">{formatPeriod(m.period_year, m.period_month)}</td>
-                  <td className="py-2 text-right font-medium">{fmtNum(m.total_gallons)}</td>
-                  <td className="py-2 text-right text-gray-500">{fmtNum(m.ultrachem_gallons)}</td>
-                  <td className="py-2 text-right text-gray-500">{fmtNum(m.external_gallons)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                Context
+              </div>
+              <p className="text-sm text-gray-700 mb-4">
+                Top 3 heavy formats (Drum/Box/Pail Oil) drove{" "}
+                <span className="font-semibold text-navy">
+                  +{fmtNum(positiveDrivers.slice(0, 3).reduce((a, d) => a + d.delta, 0))} gal
+                </span>{" "}
+                of the YoY gain.
+              </p>
+              {negativeDrivers.length > 0 && (
+                <>
+                  <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2 mt-4">
+                    Drags (watchlist)
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {negativeDrivers.map(d => (
+                        <tr key={d.package_key}>
+                          <td className="py-1 text-navy">{d.display_name}</td>
+                          <td className="py-1 text-right tabular-nums">{fmtNum(d.delta_gallons)}</td>
+                          <td className="py-1 text-right text-gray-500 w-16 tabular-nums">{fmtPct(d.delta_pct, 0, false)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          </div>
         </section>
 
         <footer className="mt-12 text-xs text-gray-500 italic">
