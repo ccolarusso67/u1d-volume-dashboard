@@ -1,9 +1,5 @@
 import { query, queryOne } from "../db";
 
-// ----------------------------------------------------------------------------
-// Production lines catalog
-// ----------------------------------------------------------------------------
-
 export type ProductionLine = {
   line_key: string;
   display_name: string;
@@ -21,7 +17,7 @@ export async function getProductionLines(): Promise<ProductionLine[]> {
       display_name,
       parent_line,
       package_category,
-      max_gallons_per_day::float8 AS max_gallons_per_day,
+      max_gallons_per_day::float8    AS max_gallons_per_day,
       target_gallons_per_day::float8 AS target_gallons_per_day,
       sort_order
     FROM u1d_ops.production_lines
@@ -30,54 +26,55 @@ export async function getProductionLines(): Promise<ProductionLine[]> {
   `);
 }
 
-// ----------------------------------------------------------------------------
-// Monthly production rollup per line
-// ----------------------------------------------------------------------------
-
-export type ProductionMonthlyByLine = {
-  period_year: number;
-  period_month: number;
+/**
+ * One row per production line for the given month — including lines that
+ * had zero production that month (LEFT JOIN). Lets the UI show idle lines.
+ */
+export type LineMonthRow = {
   line_key: string;
   display_name: string;
   parent_line: string;
+  max_gallons_per_day: number;
+  target_gallons_per_day: number;
+  sort_order: number;
+  working_days: number;
   gallons: number;
   pallets: number;
-  working_days: number;
-  avg_daily_gallons: number;
-  peak_daily_gallons: number;
+  avg_daily_gallons: number | null;
+  peak_daily_gallons: number | null;
   utilization_vs_target: number | null;
 };
 
-export async function getProductionByLineForMonth(
+export async function getAllLinesForMonth(
   year: number,
   month: number
-): Promise<ProductionMonthlyByLine[]> {
-  return query<ProductionMonthlyByLine>(
+): Promise<LineMonthRow[]> {
+  return query<LineMonthRow>(
     `
     SELECT
-      mv.period_year::int              AS period_year,
-      mv.period_month::int             AS period_month,
-      mv.line_key,
-      mv.display_name,
-      mv.parent_line,
-      mv.gallons::float8               AS gallons,
-      mv.pallets::float8               AS pallets,
-      mv.working_days::int             AS working_days,
-      mv.avg_daily_gallons::float8     AS avg_daily_gallons,
-      mv.peak_daily_gallons::float8    AS peak_daily_gallons,
-      mv.utilization_vs_target::float8 AS utilization_vs_target
-    FROM u1d_ops.mv_production_monthly mv
-    JOIN u1d_ops.production_lines pl USING (line_key)
-    WHERE mv.period_year = $1 AND mv.period_month = $2
+      pl.line_key,
+      pl.display_name,
+      pl.parent_line,
+      pl.max_gallons_per_day::float8    AS max_gallons_per_day,
+      pl.target_gallons_per_day::float8 AS target_gallons_per_day,
+      pl.sort_order,
+      COALESCE(mv.working_days, 0)::int      AS working_days,
+      COALESCE(mv.gallons, 0)::float8        AS gallons,
+      COALESCE(mv.pallets, 0)::float8        AS pallets,
+      mv.avg_daily_gallons::float8           AS avg_daily_gallons,
+      mv.peak_daily_gallons::float8          AS peak_daily_gallons,
+      mv.utilization_vs_target::float8       AS utilization_vs_target
+    FROM u1d_ops.production_lines pl
+    LEFT JOIN u1d_ops.mv_production_monthly mv
+      ON mv.line_key = pl.line_key
+     AND mv.period_year = $1
+     AND mv.period_month = $2
+    WHERE pl.is_active = TRUE
     ORDER BY pl.sort_order
   `,
     [year, month]
   );
 }
-
-// ----------------------------------------------------------------------------
-// Latest month with production data
-// ----------------------------------------------------------------------------
 
 export type LatestProductionMonth = {
   period_year: number;
@@ -99,10 +96,6 @@ export async function getLatestProductionMonth(): Promise<LatestProductionMonth 
     LIMIT 1
   `);
 }
-
-// ----------------------------------------------------------------------------
-// Reconciliation (produced vs billed) — all periods
-// ----------------------------------------------------------------------------
 
 export type ReconciliationRow = {
   period_year: number;
