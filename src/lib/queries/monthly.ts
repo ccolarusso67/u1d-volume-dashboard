@@ -1,4 +1,5 @@
 import { query, queryOne } from "../db";
+import { categorizeFamily, type CategoryLabel } from "./category";
 
 export type MonthlyKPI = {
   period_year: number;
@@ -191,7 +192,7 @@ export async function getYTDComparison(
 export type CategoryTrendRow = {
   period_year: number;
   period_month: number;
-  category: string;
+  category: CategoryLabel;
   gallons: number;
 };
 
@@ -201,12 +202,16 @@ export async function getMonthlyCategoryTrend(n: number): Promise<CategoryTrendR
     SELECT
       vf.period_year::int  AS period_year,
       vf.period_month::int AS period_month,
-      CASE
-        WHEN p.package_key IN ('PAIL OIL', 'DRUM OIL', 'TOTE OIL', 'BULK OIL') THEN 'Heavy Oil'
-        WHEN p.package_key IN ('LITER OIL', 'GAL OIL', 'JUG OIL', 'JERRYCAN OIL', 'BOX OIL') THEN 'Light Oil'
-        WHEN p.family = 'COOL' THEN 'Coolant'
-        WHEN p.family = 'WW'   THEN 'WW'
-        WHEN p.family = 'DEF'  THEN 'DEF'
+      -- MUST mirror categorizeFamily() in src/lib/queries/category.ts.
+      -- The family enum is constrained to lowercase tokens in the catalog
+      -- (PR 002 — Board Accuracy Hotfix). Previous version compared against
+      -- uppercase 'COOL' / 'WW' / 'DEF' and silently bucketed those families
+      -- as 'Other' on the 6-month trend chart.
+      CASE p.family
+        WHEN 'oil'          THEN 'Oil'
+        WHEN 'coolant'      THEN 'Coolant'
+        WHEN 'washer_fluid' THEN 'WW'
+        WHEN 'def'          THEN 'DEF'
         ELSE 'Other'
       END AS category,
       SUM(vf.gallons)::float8 AS gallons
