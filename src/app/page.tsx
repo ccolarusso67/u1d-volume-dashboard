@@ -8,12 +8,16 @@ import {
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
 import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
+import { CATEGORY_DISPLAY_ORDER } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
 import { PackageMixChart } from "@/components/charts/PackageMixChart";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORIES = ["Heavy Oil", "Light Oil", "Coolant", "WW", "DEF"];
+// Categories rendered by the stacked-bar chart. Sourced from the canonical
+// CATEGORY_DISPLAY_ORDER so any change to the family -> category mapping flows
+// through one place. "Other" is intentionally omitted from the chart stack.
+const CATEGORIES = CATEGORY_DISPLAY_ORDER.filter((c) => c !== "Other");
 
 function ytdLabel(month: number): string {
   if (month <= 3) return "YTD Q1";

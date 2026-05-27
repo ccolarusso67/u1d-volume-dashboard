@@ -5,13 +5,15 @@ import {
   Tooltip, XAxis, YAxis,
 } from "recharts";
 
+// Category palette. Single source of truth for the stacked-bar chart
+// after PR 002 collapsed the Heavy/Light oil split into a single "Oil"
+// category that mirrors the packages.family enum.
 const CATEGORY_COLORS: Record<string, string> = {
-  "Heavy Oil":  "#003C71",
-  "Light Oil":  "#4A6F94",
-  "Coolant":    "#E1261C",
-  "WW":         "#F59E0B",
-  "DEF":        "#6B7280",
-  "Other":      "#9CA3AF",
+  "Oil":      "#003C71",
+  "Coolant":  "#E1261C",
+  "WW":       "#F59E0B",
+  "DEF":      "#6B7280",
+  "Other":    "#9CA3AF",
 };
 
 export type StackedTrendRow = {
