@@ -12,6 +12,7 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { HeroHeader } from "@/components/layout/hero-header";
 import { PeriodsTable } from "@/components/admin/periods-table";
 import { listPeriods } from "@/lib/periods/list-periods";
 import { getPool } from "@/lib/db-pool";
@@ -37,22 +38,17 @@ export default async function PeriodsIndexPage() {
 
   return (
     <main>
-      <header className="bg-navy text-white">
-        <div className="container mx-auto px-8 py-6 max-w-7xl">
-          <div className="text-[11px] tracking-[0.2em] opacity-80 mb-1">
-            U1DYNAMICS MANUFACTURING LLC
-          </div>
-          <h1 className="font-heading text-3xl font-bold">Periods / Monthly Close</h1>
-          <div className="text-sm opacity-80 mt-2 italic">
-            Every tracked period and where it stands in the monthly close
-            workflow. Signed in as {session.user.email}.
+      <HeroHeader
+        eyebrow="U1DYNAMICS MANUFACTURING LLC"
+        title="Periods / Monthly Close"
+        subtitle={
+          <>
+            Every tracked period and where it stands in the monthly close workflow. Signed in as {session.user.email}.
             <span className="mx-2">·</span>
-            <a href="/admin" className="underline opacity-90 hover:opacity-100">
-              Back to admin home
-            </a>
-          </div>
-        </div>
-      </header>
+            <a href="/admin" className="underline opacity-90 hover:opacity-100">Back to admin home</a>
+          </>
+        }
+      />
       <Nav current="/admin/periods" />
 
       <div className="container mx-auto px-8 py-8 max-w-7xl space-y-6">

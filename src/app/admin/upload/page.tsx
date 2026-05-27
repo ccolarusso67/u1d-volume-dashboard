@@ -14,6 +14,7 @@ import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 import { Pool } from "pg";
 import { Nav } from "@/components/nav";
+import { HeroHeader } from "@/components/layout/hero-header";
 import { UploadForm } from "@/components/admin/upload-form";
 import { UploadHistoryTable } from "@/components/admin/upload-history-table";
 import { listUploadHistory } from "@/lib/upload/list-upload-history";
@@ -61,24 +62,17 @@ export default async function UploadPage() {
 
   return (
     <main>
-      <header className="bg-navy text-white">
-        <div className="container mx-auto px-8 py-6 max-w-7xl">
-          <div className="text-[11px] tracking-[0.2em] opacity-80 mb-1">
-            U1DYNAMICS MANUFACTURING LLC
-          </div>
-          <h1 className="font-heading text-3xl font-bold">Monthly Board Report Upload</h1>
-          <div className="text-sm opacity-80 mt-2 italic">
-            Upload the latest monthly operating file. The system will parse, version,
-            persist, and flag alerts automatically.
-          </div>
-          <div className="text-xs opacity-70 mt-2">
-            Signed in as {session.user.email} ·
-            <a href="/admin" className="underline hover:opacity-100 opacity-90 ml-1">
-              Back to admin home
-            </a>
-          </div>
-        </div>
-      </header>
+      <HeroHeader
+        eyebrow="U1DYNAMICS MANUFACTURING LLC"
+        title="Monthly Board Report Upload"
+        subtitle="Upload the latest monthly operating file. The system will parse, version, persist, and flag alerts automatically."
+        meta={
+          <>
+            Signed in as {session.user.email}<br />
+            <a href="/admin" className="underline hover:opacity-100 opacity-90">Back to admin home</a>
+          </>
+        }
+      />
       <Nav current="/admin/upload" />
 
       <div className="container mx-auto px-8 py-8 max-w-5xl space-y-8">

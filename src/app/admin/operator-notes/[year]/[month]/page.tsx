@@ -10,6 +10,7 @@
 import { auth } from "@/auth";
 import { notFound, redirect } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { HeroHeader } from "@/components/layout/hero-header";
 import { getPool } from "@/lib/db-pool";
 import { getOperatorNotes } from "@/lib/operator-notes/get-operator-notes";
 import { OperatorNotesForm } from "@/components/admin/operator-notes-form";
@@ -58,13 +59,11 @@ export default async function OperatorNotesPage({
   } catch (err) {
     return (
       <main>
-        <header className="bg-navy text-white">
-          <div className="container mx-auto px-8 py-6 max-w-7xl">
-            <h1 className="font-heading text-2xl font-bold">
-              Operator Notes — {formatPeriod(year, month, "en")}
-            </h1>
-          </div>
-        </header>
+        <HeroHeader
+          eyebrow="U1DYNAMICS MANUFACTURING LLC"
+          title={`Operator Notes — ${formatPeriod(year, month, "en")}`}
+          subtitle="Could not load notes for this period."
+        />
         <Nav current="/admin/operator-notes" />
         <div className="container mx-auto px-8 py-8 max-w-3xl">
           <div role="alert" className="bg-red-50 border border-red-200 text-red-900 rounded-sm px-4 py-3 text-sm">
@@ -80,42 +79,25 @@ export default async function OperatorNotesPage({
 
   return (
     <main>
-      <header className="bg-navy text-white">
-        <div className="container mx-auto px-8 py-6 max-w-7xl">
-          <div className="text-[11px] tracking-[0.2em] opacity-80 mb-1">
-            U1DYNAMICS MANUFACTURING LLC
-          </div>
-          <h1 className="font-heading text-3xl font-bold">
-            Operator Notes — {formatPeriod(year, month, "en")}
-          </h1>
-          <div className="text-sm opacity-80 mt-2 italic">
+      <HeroHeader
+        eyebrow="U1DYNAMICS MANUFACTURING LLC"
+        title={`Operator Notes — ${formatPeriod(year, month, "en")}`}
+        subtitle={
+          <>
             {notes.is_complete ? (
-              <>
-                Marked complete on {formatLocaleDateTime(notes.completed_at)} by{" "}
-                {notes.completed_by ?? "—"}.
-              </>
+              <>Marked complete on {formatLocaleDateTime(notes.completed_at)} by {notes.completed_by ?? "—"}.</>
             ) : notes.exists ? (
-              <>
-                Draft last updated {formatLocaleDateTime(notes.updated_at)} by{" "}
-                {notes.updated_by ?? "—"}. Not yet complete.
-              </>
+              <>Draft last updated {formatLocaleDateTime(notes.updated_at)} by {notes.updated_by ?? "—"}. Not yet complete.</>
             ) : (
               <>No notes saved yet for this period.</>
             )}
             <span className="mx-2">·</span>
-            <a
-              href={`/admin/review/${year}/${month}`}
-              className="underline opacity-90 hover:opacity-100"
-            >
-              Open review
-            </a>
+            <a href={`/admin/review/${year}/${month}`} className="underline opacity-90 hover:opacity-100">Open review</a>
             <span className="mx-2">·</span>
-            <a href="/admin/upload" className="underline opacity-90 hover:opacity-100">
-              Back to upload
-            </a>
-          </div>
-        </div>
-      </header>
+            <a href="/admin/upload" className="underline opacity-90 hover:opacity-100">Back to upload</a>
+          </>
+        }
+      />
       <Nav current="/admin/operator-notes" />
 
       <div className="container mx-auto px-8 py-8 max-w-3xl space-y-6">
