@@ -4,6 +4,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/production", label: "Production" },
   { href: "/reconciliation", label: "Reconciliation" },
+  { href: "/admin", label: "Admin" },
+  { href: "/board", label: "Board" },
 ];
 
 export function Nav({ current }: { current: string }) {
