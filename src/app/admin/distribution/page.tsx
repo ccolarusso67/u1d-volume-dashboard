@@ -9,6 +9,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { HeroHeader } from "@/components/layout/hero-header";
 import { getPool } from "@/lib/db-pool";
 import { listDistributionLists } from "@/lib/distribution/list-distribution-lists";
 import { getDistributionList } from "@/lib/distribution/get-distribution-list";
@@ -27,22 +28,17 @@ export default async function AdminDistributionPage() {
 
   return (
     <main>
-      <header className="bg-navy text-white">
-        <div className="container mx-auto px-8 py-6 max-w-7xl">
-          <div className="text-[11px] tracking-[0.2em] opacity-80 mb-1">
-            U1DYNAMICS MANUFACTURING LLC
-          </div>
-          <h1 className="font-heading text-3xl font-bold">Board Distribution</h1>
-          <div className="text-sm opacity-80 mt-2 italic">
-            Read-only view of the active distribution list and recipients. Edits go through
-            SQL in this PR; the management UI ships in PR 004E.
+      <HeroHeader
+        eyebrow="U1DYNAMICS MANUFACTURING LLC"
+        title="Board Distribution"
+        subtitle={
+          <>
+            Read-only view of the active distribution list and recipients. Edits go through SQL in this PR; the management UI ships in PR 004E.
             <span className="mx-2">·</span>
-            <a href="/admin" className="underline opacity-90 hover:opacity-100">
-              Back to admin home
-            </a>
-          </div>
-        </div>
-      </header>
+            <a href="/admin" className="underline opacity-90 hover:opacity-100">Back to admin home</a>
+          </>
+        }
+      />
       <Nav current="/admin/distribution" />
 
       <div className="container mx-auto px-8 py-8 max-w-5xl space-y-6">

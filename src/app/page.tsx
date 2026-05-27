@@ -1,5 +1,6 @@
 import { KPITile } from "@/components/kpi-tile";
 import { Nav } from "@/components/nav";
+import { HeroHeader } from "@/components/layout/hero-header";
 import {
   getLatestMonth, getMonth, getRecentMonths,
   getCustomerYoYForMonth, getPackageMixForMonth,
@@ -100,18 +101,11 @@ export default async function DashboardPage() {
 
   return (
     <main>
-      <header className="bg-navy text-white">
-        <div className="container mx-auto px-8 py-6 max-w-7xl">
-          <div className="text-[11px] tracking-[0.2em] opacity-80 mb-1">
-            U1DYNAMICS MANUFACTURING LLC
-          </div>
-          <h1 className="font-heading text-3xl font-bold">Volume Dashboard</h1>
-          <div className="text-sm opacity-80 mt-2 italic">
-            Latest period: {formatPeriod(latest.period_year, latest.period_month)} ·{" "}
-            {fmtNum(latest.total_gallons)} gallons
-          </div>
-        </div>
-      </header>
+      <HeroHeader
+        eyebrow="U1DYNAMICS MANUFACTURING LLC"
+        title="Volume Dashboard"
+        subtitle={<>Latest period: {formatPeriod(latest.period_year, latest.period_month)} · {fmtNum(latest.total_gallons)} gallons</>}
+      />
       <Nav current="/" />
 
       <div className="container mx-auto px-8 py-8 max-w-7xl">

@@ -18,3 +18,7 @@ table,
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Hide scrollbar on horizontal-scroll containers (mobile nav, etc.) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
