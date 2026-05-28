@@ -17,6 +17,11 @@ import { fmtNum, fmtPct } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
+function isLocalBoardPreview(): boolean {
+  return process.env.NODE_ENV !== "production" &&
+    process.env.U1D_LOCAL_BOARD_PREVIEW === "1";
+}
+
 function formatLocaleDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -29,14 +34,16 @@ function formatLocaleDateTime(iso: string | null): string {
 
 export default async function BoardIndexPage() {
   const session = await auth();
-  if (!session?.user?.email) {
+  const localPreview = isLocalBoardPreview();
+  if (!session?.user?.email && !localPreview) {
     redirect("/login?callbackUrl=/board");
   }
   // Admin-only for this PR. When a board-viewer role exists, swap this for a
   // role-aware check.
-  if (session.user.isAdmin !== true) {
+  if (session?.user?.isAdmin !== true && !localPreview) {
     redirect("/?error=forbidden");
   }
+  const viewerEmail = session?.user?.email ?? "local-board-preview";
 
   let rows: Awaited<ReturnType<typeof listBoardPeriods>> = [];
   let error: string | null = null;
@@ -53,7 +60,7 @@ export default async function BoardIndexPage() {
         title="Board Dashboard"
         subtitle={
           <>
-            Locked, board-ready monthly operating dashboards. Signed in as {session.user.email}.
+            Locked, board-ready monthly operating dashboards. Signed in as {viewerEmail}.
             <span className="mx-2">·</span>
             <a href="/admin/periods" className="underline opacity-90 hover:opacity-100">
               Admin: all periods (including unready)
