@@ -26,6 +26,7 @@ import { SectionCard } from "@/components/layout/section-card";
 import { KpiCard } from "@/components/layout/kpi-card";
 import { getPool } from "@/lib/db-pool";
 import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
+import { generateBoardNarrative, type NarrativeSeverity } from "@/lib/board/narrative";
 import { listDistributionLists } from "@/lib/distribution/list-distribution-lists";
 import { listBoardDeckSends } from "@/lib/distribution/list-board-deck-sends";
 import { formatBlockerLabels } from "@/lib/review/blocker-labels";
@@ -164,6 +165,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   const lockedAtLabel = formatLocaleDateTime(view.period.locked_at);
   const uploadedAtLabel = formatLocaleDateTime(view.activeFile?.uploaded_at ?? null);
   const lastUpdatedLabel = formatLocaleDateTime(view.lockHistory[0]?.event_at ?? view.period.locked_at);
+  const narrative = generateBoardNarrative(view);
 
   return (
     <AppShell
@@ -262,6 +264,40 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         <p className="mt-3 text-[11px] italic text-gray-500">
           YTD includes {view.ytd.months_included} of {view.ytd.months_included + view.ytd.months_missing} months locked this year.
         </p>
+
+        <div className="mt-6 border-t border-gray-100 pt-5">
+          <div className="mb-5">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500 font-semibold">
+              Board narrative
+            </div>
+            {narrative.sections
+              .find((section) => section.id === "executive-readout")
+              ?.paragraphs?.map((paragraph, i) => (
+                <p key={i} className="mt-2 max-w-5xl text-sm leading-relaxed text-gray-800">
+                  {paragraph}
+                </p>
+              ))}
+          </div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {narrative.sections
+              .filter((section) => section.id !== "executive-readout")
+              .map((section) => (
+                <div key={section.id}>
+                  <h3 className="mb-3 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                    {section.title}
+                  </h3>
+                  <ul className="space-y-2">
+                    {(section.bullets ?? []).map((bullet, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-gray-800">
+                        <NarrativeSeverityBadge severity={bullet.severity} />
+                        <span>{bullet.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+          </div>
+        </div>
       </SectionCard>
 
       {/* 2. Revenue / volume */}
@@ -616,6 +652,22 @@ function SmallStat({ label, value, sub, tone }: { label: string; value: string; 
       <div className="font-heading text-xl font-bold mt-1 leading-none tabular-nums">{value}</div>
       {sub && <div className="text-[10px] opacity-70 mt-auto pt-2 truncate">{sub}</div>}
     </div>
+  );
+}
+
+const NARRATIVE_BADGE: Record<NarrativeSeverity, { label: string; className: string }> = {
+  positive: { label: "OK", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  neutral: { label: "Note", className: "border-gray-200 bg-gray-50 text-gray-600" },
+  watch: { label: "Watch", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  risk: { label: "Risk", className: "border-red-200 bg-red-50 text-red-800" },
+};
+
+function NarrativeSeverityBadge({ severity }: { severity: NarrativeSeverity }) {
+  const badge = NARRATIVE_BADGE[severity];
+  return (
+    <span className={`mt-0.5 inline-flex min-w-[3.25rem] justify-center rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${badge.className}`}>
+      {badge.label}
+    </span>
   );
 }
 
