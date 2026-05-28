@@ -38,6 +38,11 @@ export const dynamic = "force-dynamic";
 
 type Params = { year: string; month: string };
 
+function isLocalBoardPreview(): boolean {
+  return process.env.NODE_ENV !== "production" &&
+    process.env.U1D_LOCAL_BOARD_PREVIEW === "1";
+}
+
 function formatLocaleDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -66,8 +71,9 @@ function DeltaText({ value }: { value: number | null }) {
 
 export default async function BoardDashboardPage({ params }: { params: Promise<Params> }) {
   const session = await auth();
-  if (!session?.user?.email) redirect(`/login?callbackUrl=/board`);
-  if (session.user.isAdmin !== true) redirect("/?error=forbidden");
+  const localPreview = isLocalBoardPreview();
+  if (!session?.user?.email && !localPreview) redirect(`/login?callbackUrl=/board`);
+  if (session?.user?.isAdmin !== true && !localPreview) redirect("/?error=forbidden");
 
   const { year: y, month: m } = await params;
   const year = parseInt(y, 10);
@@ -152,41 +158,57 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   const h = view.currentMetrics;
   const noFacts = h.fact_row_count === 0;
   const activeList = distributionLists.find((l) => l.is_active);
+  const statusLabel = view.period.status
+    ? view.period.status.charAt(0).toUpperCase() + view.period.status.slice(1)
+    : "No status";
+  const lockedAtLabel = formatLocaleDateTime(view.period.locked_at);
+  const uploadedAtLabel = formatLocaleDateTime(view.activeFile?.uploaded_at ?? null);
+  const lastUpdatedLabel = formatLocaleDateTime(view.lockHistory[0]?.event_at ?? view.period.locked_at);
 
   return (
     <AppShell
       hero={
         <HeroHeader
           eyebrow="U1DYNAMICS MANUFACTURING LLC"
-          title={`${view.period.label} · Board Dashboard`}
+          title="Board Report"
           subtitle={
-            <>
-              Locked monthly operating view · version {view.activeFile?.version_no ?? "—"} ·
-              locked {formatLocaleDateTime(view.period.locked_at)} by {view.period.locked_by ?? "—"}
+            <div className="not-italic">
+              <span className="font-medium text-white">{view.period.label}</span>
+              <span className="mx-2 opacity-70">·</span>
+              <span>Locked monthly operating view</span>
+              <span className="mx-2 opacity-70">·</span>
+              <a href="/board" className="underline opacity-90 hover:opacity-100">All locked periods</a>
               {view.reopenCount > 0 && (
-                <span className="ml-2 not-italic text-[11px] bg-white/10 px-2 py-0.5 rounded-sm">
+                <span className="ml-2 text-[11px] bg-white/10 px-2 py-0.5 rounded-sm">
                   reopened {view.reopenCount === 1 ? "once" : `${view.reopenCount} times`}
                 </span>
               )}
-              <span className="mx-2">·</span>
-              <a href="/board" className="underline opacity-90 hover:opacity-100">All locked periods</a>
-            </>
+            </div>
           }
           actions={
-            <a
-              href={`/api/admin/deck/${year}/${month}`}
-              className="inline-flex items-center gap-2 bg-white text-navy hover:bg-gray-100 font-medium text-sm px-4 py-2.5 rounded-sm transition-colors shadow-sm"
-              aria-label="Generate and download the PowerPoint board deck for this period"
-            >
-              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-              </svg>
-              Generate board deck (.pptx)
-            </a>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <HeroMetaItem label="Reporting period" value={view.period.label} />
+                <HeroMetaItem label="Status" value={statusLabel} sub={`Locked by ${view.period.locked_by ?? "—"}`} />
+                <HeroMetaItem label="Data freshness" value={uploadedAtLabel} sub={`Source v${view.activeFile?.version_no ?? "—"}`} />
+                <HeroMetaItem label="Last updated" value={lastUpdatedLabel} sub={`Locked ${lockedAtLabel}`} />
+              </div>
+              <a
+                href={`/api/admin/deck/${year}/${month}`}
+                className="inline-flex shrink-0 items-center justify-center gap-2 bg-white text-navy hover:bg-gray-100 font-medium text-sm px-4 py-2.5 rounded-sm transition-colors shadow-sm"
+                aria-label="Generate and download the PowerPoint board deck for this period"
+              >
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Generate board deck (.pptx)
+              </a>
+            </div>
           }
         />
       }
       nav={<Nav current="/board" />}
+      contentClassName="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl space-y-8"
     >
       {noFacts && (
         <section className="bg-amber-50 border border-amber-200 text-amber-900 rounded-sm px-5 py-4 text-sm">
@@ -194,36 +216,12 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </section>
       )}
 
-      {/* Board distribution (PR 004D) */}
-      <SectionCard
-        title="Board distribution"
-        subtitle={<>Send the generated deck to the named distribution list. Audited in <code>u1d_ops.board_deck_sends</code>.</>}
-        actions={
-          <EmailBoardDeckButton
-            year={year} month={month}
-            distributionListId={activeList?.list_id ?? null}
-            distributionListName={activeList?.name ?? null}
-            recipientCount={activeList?.active_to_count ?? 0}
-          />
-        }
-      >
-        {activeList ? (
-          <div className="text-xs text-gray-700">
-            Active list: <span className="font-medium text-navy">{activeList.name}</span>
-            {" · "}
-            {activeList.active_to_count} to · {activeList.active_cc_count} cc · {activeList.active_bcc_count} bcc
-          </div>
-        ) : (
-          <div className="text-xs italic text-gray-500">No distribution list configured.</div>
-        )}
-      </SectionCard>
-
       {/* 1. Executive snapshot — 8 KPI cards */}
       <SectionCard
-        title="Executive snapshot"
+        title="Executive Summary"
         subtitle="Locked-only data. YoY uses the same month one year prior; superseded versions are excluded."
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard label="Total gallons" value={fmtNum(h.total_gallons)} sub="this month" tone="navy" />
           <KpiCard
             label="Month over month"
@@ -266,10 +264,10 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </p>
       </SectionCard>
 
-      {/* 2. Volume trends */}
+      {/* 2. Revenue / volume */}
       <SectionCard
-        title="Volume trends"
-        subtitle="Each bar is the total gallons for a locked period. Outline-only bars indicate periods not yet locked (excluded from YTD / YoY comparisons)."
+        title="Revenue / Volume"
+        subtitle="Current board data is volume-based. Each bar is total gallons for a locked period; outline-only bars indicate periods not yet locked."
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TrendBars title="6-month trend" rows={view.trend6} />
@@ -283,7 +281,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         meta={`Top ${view.topCustomers.length}`}
       >
         {/* Concentration strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid auto-rows-fr grid-cols-1 gap-3 mb-5 sm:grid-cols-2 lg:grid-cols-4">
           <SmallStat label="Top customer share" value={view.customerConcentration.top_customer_share !== null
             ? fmtPct(view.customerConcentration.top_customer_share) : "—"}
             sub={view.customerConcentration.top_customer_name ?? "—"}
@@ -305,37 +303,39 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
 
         {/* Top customers table */}
         {view.topCustomers.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-2 pr-3 font-medium">#</th>
-                <th className="text-left pb-2 pr-3 font-medium">Customer</th>
-                <th className="text-right pb-2 pr-3 font-medium">Gallons</th>
-                <th className="text-right pb-2 pr-3 font-medium">Share</th>
-                <th className="text-right pb-2 pr-3 font-medium">MoM</th>
-                <th className="text-right pb-2 pr-3 font-medium">YoY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.topCustomers.map((c, i) => (
-                <tr key={c.customer_key ?? `c-${i}`} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
-                  <td className="py-2 pr-3 text-gray-400 tabular-nums">{i + 1}</td>
-                  <td className="py-2 pr-3 text-navy">
-                    {c.customer_name}
-                    {c.is_intercompany && (
-                      <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">intercomp.</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-3 text-right tabular-nums font-medium">{fmtNum(c.gallons)}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-gray-700">
-                    {c.share_pct !== null ? fmtPct(c.share_pct) : "—"}
-                  </td>
-                  <td className="py-2 pr-3 text-right"><DeltaText value={c.mom_delta_pct} /></td>
-                  <td className="py-2 pr-3 text-right"><DeltaText value={c.yoy_delta_pct} /></td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-2 pr-3 font-medium">#</th>
+                  <th className="text-left pb-2 pr-3 font-medium">Customer</th>
+                  <th className="text-right pb-2 pr-3 font-medium">Gallons</th>
+                  <th className="text-right pb-2 pr-3 font-medium">Share</th>
+                  <th className="text-right pb-2 pr-3 font-medium">MoM</th>
+                  <th className="text-right pb-2 pr-3 font-medium">YoY</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {view.topCustomers.map((c, i) => (
+                  <tr key={c.customer_key ?? `c-${i}`} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                    <td className="py-2.5 pr-3 text-gray-400 tabular-nums">{i + 1}</td>
+                    <td className="py-2.5 pr-3 text-navy">
+                      {c.customer_name}
+                      {c.is_intercompany && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">intercomp.</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums font-medium">{fmtNum(c.gallons)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-700">
+                      {c.share_pct !== null ? fmtPct(c.share_pct) : "—"}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right"><DeltaText value={c.mom_delta_pct} /></td>
+                    <td className="py-2.5 pr-3 text-right"><DeltaText value={c.yoy_delta_pct} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {(view.customerMovers.topGainers.length > 0 || view.customerMovers.topDecliners.length > 0) && (
@@ -378,34 +378,36 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
 
         {/* Top packages table */}
         {view.topPackages.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-2 pr-3 font-medium">#</th>
-                <th className="text-left pb-2 pr-3 font-medium">Package</th>
-                <th className="text-left pb-2 pr-3 font-medium">Family</th>
-                <th className="text-right pb-2 pr-3 font-medium">Gallons</th>
-                <th className="text-right pb-2 pr-3 font-medium">Share</th>
-                <th className="text-right pb-2 pr-3 font-medium">MoM</th>
-                <th className="text-right pb-2 pr-3 font-medium">YoY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.topPackages.map((p, i) => (
-                <tr key={p.package_key ?? `p-${i}`} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
-                  <td className="py-2 pr-3 text-gray-400 tabular-nums">{i + 1}</td>
-                  <td className="py-2 pr-3 text-navy">{p.package_label}</td>
-                  <td className="py-2 pr-3 text-gray-500 text-xs uppercase tracking-wider">{p.family}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums font-medium">{fmtNum(p.gallons)}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-gray-700">
-                    {p.share_pct !== null ? fmtPct(p.share_pct) : "—"}
-                  </td>
-                  <td className="py-2 pr-3 text-right"><DeltaText value={p.mom_delta_pct} /></td>
-                  <td className="py-2 pr-3 text-right"><DeltaText value={p.yoy_delta_pct} /></td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-2 pr-3 font-medium">#</th>
+                  <th className="text-left pb-2 pr-3 font-medium">Package</th>
+                  <th className="text-left pb-2 pr-3 font-medium">Family</th>
+                  <th className="text-right pb-2 pr-3 font-medium">Gallons</th>
+                  <th className="text-right pb-2 pr-3 font-medium">Share</th>
+                  <th className="text-right pb-2 pr-3 font-medium">MoM</th>
+                  <th className="text-right pb-2 pr-3 font-medium">YoY</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {view.topPackages.map((p, i) => (
+                  <tr key={p.package_key ?? `p-${i}`} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                    <td className="py-2.5 pr-3 text-gray-400 tabular-nums">{i + 1}</td>
+                    <td className="py-2.5 pr-3 text-navy">{p.package_label}</td>
+                    <td className="py-2.5 pr-3 text-gray-500 text-xs uppercase tracking-wider">{p.family}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums font-medium">{fmtNum(p.gallons)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-700">
+                      {p.share_pct !== null ? fmtPct(p.share_pct) : "—"}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right"><DeltaText value={p.mom_delta_pct} /></td>
+                    <td className="py-2.5 pr-3 text-right"><DeltaText value={p.yoy_delta_pct} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {(view.packageMovers.topGainers.length > 0 || view.packageMovers.topDecliners.length > 0) && (
@@ -465,9 +467,12 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </>
       )}
 
-      {/* 7. Close quality & audit */}
-      <SectionCard title="Close quality & audit">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-4">
+      {/* 7. Operational alerts */}
+      <SectionCard
+        title="Operational Alerts"
+        subtitle="Close quality, alert resolution, and audit trail for the locked period."
+      >
+        <div className="grid auto-rows-fr grid-cols-1 gap-3 text-sm mb-4 sm:grid-cols-2 lg:grid-cols-5">
           <SmallStat label="Package alerts" value={fmtNum(view.alertSummary.package_alerts_total)} />
           <SmallStat label="Customer alerts" value={fmtNum(view.alertSummary.customer_alerts_total)} />
           <SmallStat label="Data quality alerts" value={fmtNum(view.alertSummary.data_quality_alerts_total)} />
@@ -524,15 +529,74 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         )}
       </SectionCard>
 
-      {/* Recent deck sends */}
-      <SectionCard title={`Recent deck sends (${recentSends.length})`}>
-        <SendHistoryPanel sends={recentSends} />
+      {/* Send / distribution history */}
+      <SectionCard
+        title="Send / Distribution History"
+        subtitle={<>Deck distribution is audited in <code>u1d_ops.board_deck_sends</code>.</>}
+      >
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1.25fr)]">
+          <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500 font-semibold">
+              Active distribution list
+            </div>
+            {activeList ? (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <div className="font-heading text-xl font-bold text-navy leading-tight">
+                    {activeList.name}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    {activeList.active_to_count} to · {activeList.active_cc_count} cc · {activeList.active_bcc_count} bcc
+                  </div>
+                </div>
+                <EmailBoardDeckButton
+                  year={year} month={month}
+                  distributionListId={activeList.list_id}
+                  distributionListName={activeList.name}
+                  recipientCount={activeList.active_to_count}
+                />
+              </div>
+            ) : (
+              <div className="mt-3 text-xs italic text-gray-500">
+                No distribution list configured.
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <div className="mb-3 flex items-baseline justify-between gap-4">
+              <h3 className="text-[11px] uppercase tracking-[0.16em] text-gray-500 font-semibold">
+                Recent deck sends
+              </h3>
+              <span className="text-xs text-gray-500 tabular-nums">{recentSends.length}</span>
+            </div>
+            <SendHistoryPanel sends={recentSends} />
+          </div>
+        </div>
       </SectionCard>
     </AppShell>
   );
 }
 
 // ---------------- Small server components ----------------
+
+function HeroMetaItem({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-h-[86px] rounded-sm border border-white/15 bg-white/10 px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-white/65 font-semibold leading-snug">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-white tabular-nums leading-snug">
+        {value}
+      </div>
+      {sub && (
+        <div className="mt-1 text-[11px] text-white/70 leading-snug line-clamp-2">
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CATEGORY_BG: Record<string, string> = {
   Oil: "#003C71",
@@ -547,10 +611,10 @@ function SmallStat({ label, value, sub, tone }: { label: string; value: string; 
     : tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-900"
     : "border-gray-200 bg-white text-navy";
   return (
-    <div className={`border rounded-sm px-3 py-2 ${palette}`}>
-      <div className="text-[10px] uppercase tracking-wider opacity-80">{label}</div>
-      <div className="font-heading text-lg font-bold mt-0.5">{value}</div>
-      {sub && <div className="text-[10px] opacity-70 italic mt-0.5 truncate">{sub}</div>}
+    <div className={`flex h-full min-h-[92px] flex-col border rounded-sm px-3.5 py-3 ${palette}`}>
+      <div className="min-h-[1.75rem] text-[10px] uppercase tracking-[0.14em] opacity-80 leading-snug">{label}</div>
+      <div className="font-heading text-xl font-bold mt-1 leading-none tabular-nums">{value}</div>
+      {sub && <div className="text-[10px] opacity-70 mt-auto pt-2 truncate">{sub}</div>}
     </div>
   );
 }
