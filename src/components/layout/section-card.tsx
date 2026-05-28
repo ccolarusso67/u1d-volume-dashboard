@@ -36,10 +36,10 @@ export function SectionCard({
   return (
     <section className={`${shell} rounded-sm ${padding} ${className}`}>
       {hasHeader && (
-        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+        <div className="flex items-start justify-between gap-4 mb-5 border-b border-gray-100 pb-4 flex-wrap">
           <div className="min-w-0">
             {eyebrow && (
-              <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-1 font-semibold">
                 {eyebrow}
               </div>
             )}
@@ -49,7 +49,7 @@ export function SectionCard({
               </h2>
             )}
             {subtitle && (
-              <p className="text-xs text-gray-500 mt-1 max-w-2xl">{subtitle}</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-3xl leading-relaxed">{subtitle}</p>
             )}
           </div>
           {(meta || actions) && (

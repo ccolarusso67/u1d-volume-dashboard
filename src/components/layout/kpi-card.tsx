@@ -9,7 +9,7 @@
  *   - Top accent stripe (navy / emerald / amber / red) for trend cues
  *   - Small uppercase muted label
  *   - Strong Georgia value
- *   - Italic muted subtitle
+ *   - Muted subtitle pinned to the card baseline
  */
 type Tone = "navy" | "ok" | "warn" | "red" | "neutral";
 
@@ -36,22 +36,22 @@ export function KpiCard({
 }: Props) {
   return (
     <div
-      className={`relative bg-white border border-gray-200 rounded-sm shadow-sm hover:shadow transition-shadow ${className}`}
+      className={`relative h-full min-h-[142px] bg-white border border-gray-200 rounded-sm shadow-sm ${className}`}
     >
       {/* Top accent stripe */}
       <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-sm ${ACCENT[tone]}`} />
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-medium">
+      <div className="flex h-full flex-col px-5 pt-5 pb-4">
+        <div className="flex min-h-[2rem] items-start justify-between gap-3">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500 font-semibold leading-snug">
             {label}
           </div>
-          {badge && <div>{badge}</div>}
+          {badge && <div className="shrink-0">{badge}</div>}
         </div>
-        <div className="font-heading text-2xl md:text-3xl font-bold text-navy leading-tight mt-2 tabular-nums">
+        <div className="font-heading text-[1.75rem] md:text-[2rem] font-bold text-navy leading-none mt-3 tabular-nums">
           {value}
         </div>
         {sub && (
-          <div className="text-[11px] text-gray-500 italic mt-1.5 line-clamp-2">
+          <div className="text-[11px] text-gray-500 mt-auto pt-3 leading-snug line-clamp-2">
             {sub}
           </div>
         )}
