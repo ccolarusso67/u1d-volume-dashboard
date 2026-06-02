@@ -27,9 +27,17 @@ import { SectionCard } from "@/components/layout/section-card";
 import { KpiCard } from "@/components/layout/kpi-card";
 import { getPool } from "@/lib/db-pool";
 import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
-import { getBoardFinancialLayer } from "@/lib/board/get-board-financial-layer";
-import type { BoardFinancialLayer, ForecastVarianceFlag } from "@/lib/board/financial-types";
+import type { MonthlyPnl } from "@/lib/finance/types";
+import type { BoardFinanceOverlay } from "@/lib/board/executive-types";
 import { generateBoardNarrative, type NarrativeSeverity } from "@/lib/board/narrative";
+import {
+  getVolumeDecisionCard,
+  getMarginDecisionCard,
+  getCashDecisionCard,
+  getCustomerDecisionCard,
+  type DecisionCard as DecisionCardData,
+  type DecisionTone,
+} from "@/lib/board/decision-cards";
 import { listDistributionLists } from "@/lib/distribution/list-distribution-lists";
 import { listBoardDeckSends } from "@/lib/distribution/list-board-deck-sends";
 import { formatBlockerLabels } from "@/lib/review/blocker-labels";
@@ -69,6 +77,45 @@ function formatMoney(n: number | null): string {
   return `${sign}$${fmtNum(Math.abs(n))}`;
 }
 
+/** Coerce a pg numeric (number | numeric-string) to a finite number. */
+function num(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+/** Gross margin for a single P&L row, formatted as a share ("15.5%"). */
+function pnlMarginPct(row: MonthlyPnl): string {
+  const income = num(row.income);
+  if (income === 0) return "—";
+  return fmtPct(num(row.gross_profit) / income, 1, false);
+}
+
+function marginTone(row: MonthlyPnl): "ok" | "warn" | "neutral" {
+  const income = num(row.income);
+  if (income === 0) return "neutral";
+  return num(row.gross_profit) / income >= 0 ? "ok" : "warn";
+}
+
+/** "2026-03-01" -> "Mar 2026". */
+function pnlMonthLabel(monthIso: string): string {
+  const d = new Date(monthIso);
+  if (isNaN(d.valueOf())) return monthIso;
+  return `${monthShort(d.getUTCMonth() + 1)} ${d.getUTCFullYear()}`;
+}
+
+/** Short data-freshness suffix for the finance section subtitle. */
+function financeFreshness(finance: { sync_assessment: { worst_status: "ok" | "stale" | "error"; newest_success_at: string | null } }): string {
+  const a = finance.sync_assessment;
+  if (a.worst_status === "error") return " Sync status: ERROR — figures may be stale.";
+  if (a.worst_status === "stale") return " Sync status: stale (last success > 24h).";
+  if (a.newest_success_at) return ` Last synced ${formatLocaleDateTime(a.newest_success_at)}.`;
+  return "";
+}
+
 function DeltaText({ value }: { value: number | null }) {
   if (value === null) return <span className="text-gray-400">—</span>;
   const positive = value >= 0;
@@ -96,14 +143,12 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   }
 
   let view: Awaited<ReturnType<typeof getBoardExecutiveDashboard>>;
-  let financial: BoardFinancialLayer;
   let distributionLists: Awaited<ReturnType<typeof listDistributionLists>> = [];
   let recentSends: Awaited<ReturnType<typeof listBoardDeckSends>> = [];
   try {
     const pool = getPool();
-    [view, financial, distributionLists, recentSends] = await Promise.all([
+    [view, distributionLists, recentSends] = await Promise.all([
       getBoardExecutiveDashboard(pool, year, month),
-      getBoardFinancialLayer(year, month),
       listDistributionLists(pool),
       listBoardDeckSends(pool, year, month, 10),
     ]);
@@ -177,6 +222,13 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   const uploadedAtLabel = formatLocaleDateTime(view.activeFile?.uploaded_at ?? null);
   const lastUpdatedLabel = formatLocaleDateTime(view.lockHistory[0]?.event_at ?? view.period.locked_at);
   const narrative = generateBoardNarrative(view);
+
+  // Decision-for-Management cards — same auto-generation as the v2 deck, so
+  // the on-screen board view and the .pptx ask the board the same questions.
+  const decisionVolume = getVolumeDecisionCard(view);
+  const decisionMargin = getMarginDecisionCard(view);
+  const decisionCash = getCashDecisionCard(view);
+  const decisionCustomer = getCustomerDecisionCard(view);
 
   return (
     <AppShell
@@ -320,97 +372,137 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
           <TrendBars title="6-month trend" rows={view.trend6} />
           <TrendBars title="12-month trend" rows={view.trend12} />
         </div>
+        <DecisionCard card={decisionVolume} />
       </SectionCard>
 
-      {/* 3. Financial performance */}
+      {/* 3. Financial performance — canonical QuickBooks P&L (u1p_finance, direct DB) */}
       <SectionCard
         title="Financial Performance"
-        subtitle={`U1Dynamics finance bridge. Connector company_id: ${financial.companyId}.`}
+        subtitle={
+          view.finance
+            ? `Canonical QuickBooks P&L (u1p_finance · company_id u1dynamics, accrual basis).${financeFreshness(view.finance)}`
+            : "U1Dynamics finance warehouse is not connected for this deployment."
+        }
       >
-        {financial.pnl ? (
-          <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Revenue" value={formatMoney(financial.pnl.revenue)} sub="monthly P&L" tone="navy" />
-            <KpiCard label="COGS" value={formatMoney(financial.pnl.cogs)} sub="monthly P&L" tone="neutral" />
-            <KpiCard label="Gross profit" value={formatMoney(financial.pnl.grossProfit)} sub="revenue less COGS" tone={financial.pnl.grossProfit >= 0 ? "ok" : "warn"} />
-            <KpiCard
-              label="Gross margin"
-              value={financial.pnl.grossMarginPct !== null ? fmtPct(financial.pnl.grossMarginPct, 1, false) : "—"}
-              sub="gross profit ÷ revenue"
-              tone={financial.pnl.grossMarginPct === null ? "neutral" : financial.pnl.grossMarginPct >= 0 ? "ok" : "warn"}
-            />
-          </div>
-        ) : (
-          <FinancialEmptyState>
-            U1Dynamics P&amp;L data is not yet connected for this board period.
-          </FinancialEmptyState>
-        )}
-
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-                Forecast vs actual
-              </h3>
-              {financial.forecastActual && <ForecastFlag flag={financial.forecastActual.flag} />}
-            </div>
-            {financial.forecastActual ? (
-              <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
-                <FinancialMetric label="Forecast cost" value={formatMoney(financial.forecastActual.forecastCost)} />
-                <FinancialMetric label="Actual cost" value={formatMoney(financial.forecastActual.actualCost)} />
-                <FinancialMetric label="Variance $" value={formatMoney(financial.forecastActual.varianceDollars)} />
-                <FinancialMetric
-                  label="Variance %"
-                  value={financial.forecastActual.variancePct !== null ? fmtPct(financial.forecastActual.variancePct) : "—"}
+        {view.finance ? (
+          <>
+            {view.finance.current ? (
+              <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard label="Revenue" value={formatMoney(num(view.finance.current.income))} sub={`${view.period.label} · accrual`} tone="navy" />
+                <KpiCard label="COGS" value={formatMoney(num(view.finance.current.cogs))} sub="this month" tone="neutral" />
+                <KpiCard label="Gross profit" value={formatMoney(num(view.finance.current.gross_profit))} sub="revenue less COGS" tone={num(view.finance.current.gross_profit) >= 0 ? "ok" : "warn"} />
+                <KpiCard
+                  label="Gross margin"
+                  value={pnlMarginPct(view.finance.current)}
+                  sub="gross profit ÷ revenue"
+                  tone={marginTone(view.finance.current)}
                 />
               </div>
             ) : (
-              <p className="text-sm text-gray-500">
-                Forecast vs actual cost data is not yet available for this board period.
-              </p>
+              <FinancialEmptyState>
+                No canonical P&amp;L row has been synced for {view.period.label} yet. The trailing-12 and
+                working-capital figures below reflect the most recent synced data.
+              </FinancialEmptyState>
             )}
-          </div>
 
-          <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
-            <h3 className="mb-3 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-              Monthly trend
-            </h3>
-            {financial.monthlyTrend.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-500">
-                      <th className="pb-2 pr-3 text-left font-medium">Month</th>
-                      <th className="pb-2 pr-3 text-right font-medium">Revenue</th>
-                      <th className="pb-2 pr-3 text-right font-medium">COGS</th>
-                      <th className="pb-2 pr-3 text-right font-medium">Gross profit</th>
-                      <th className="pb-2 text-right font-medium">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {financial.monthlyTrend.slice(-6).map((row) => (
-                      <tr key={row.period} className="border-b border-gray-100 last:border-b-0">
-                        <td className="py-2 pr-3 text-navy">{row.label}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(row.revenue)}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(row.cogs)}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums font-medium">{formatMoney(row.grossProfit)}</td>
-                        <td className="py-2 text-right tabular-nums">{row.grossMarginPct !== null ? fmtPct(row.grossMarginPct, 1, false) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Trailing-12 strip — the margin / net-income story */}
+            <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <SmallStat label="Revenue (TTM)" value={formatMoney(view.finance.trailing_12m.income)}
+                sub={`${view.finance.trailing_12m.months_included} of 12 months synced`} />
+              <SmallStat label="Gross margin (TTM)" value={fmtPct(view.finance.trailing_12m.gross_margin_pct, 1, false)}
+                sub="gross profit ÷ revenue" tone={view.finance.trailing_12m.gross_margin_pct >= 0 ? "ok" : "warn"} />
+              <SmallStat label="Net income (TTM)" value={formatMoney(view.finance.trailing_12m.net_income)}
+                sub="after all expenses" tone={view.finance.trailing_12m.net_income >= 0 ? "ok" : "warn"} />
+              <SmallStat label="Net margin (TTM)" value={fmtPct(view.finance.trailing_12m.net_margin_pct, 1, false)}
+                sub="net income ÷ revenue" tone={view.finance.trailing_12m.net_margin_pct >= 0 ? "ok" : "warn"} />
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Working capital — AR vs AP */}
+              <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                    Working capital (AR vs AP)
+                  </h3>
+                  {view.finance.working_capital.ap_to_ar_ratio !== null &&
+                    view.finance.working_capital.ap_to_ar_ratio > 1 && (
+                      <span className="rounded-sm border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                        AP exceeds AR
+                      </span>
+                    )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
+                  <FinancialMetric label="Accounts receivable" value={formatMoney(view.finance.working_capital.total_ar)} />
+                  <FinancialMetric label="Accounts payable" value={formatMoney(view.finance.working_capital.total_ap)} />
+                  <FinancialMetric label="Net working capital" value={formatMoney(view.finance.working_capital.net_position)} />
+                  <FinancialMetric
+                    label="AP / AR ratio"
+                    value={view.finance.working_capital.ap_to_ar_ratio !== null
+                      ? `${view.finance.working_capital.ap_to_ar_ratio.toFixed(1)}×`
+                      : "—"}
+                  />
+                </div>
+                {view.finance.working_capital.snapshot_at && (
+                  <p className="mt-3 text-[10px] italic text-gray-500">
+                    AR/AP snapshot {formatLocaleDateTime(view.finance.working_capital.snapshot_at)}.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">
-                Monthly financial trend data will appear here when connector rows are available.
-              </p>
-            )}
-          </div>
-        </div>
+
+              {/* Monthly P&L trend */}
+              <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+                <h3 className="mb-3 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Monthly trend
+                </h3>
+                {view.finance.pnl_trend.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-500">
+                          <th className="pb-2 pr-3 text-left font-medium">Month</th>
+                          <th className="pb-2 pr-3 text-right font-medium">Revenue</th>
+                          <th className="pb-2 pr-3 text-right font-medium">COGS</th>
+                          <th className="pb-2 pr-3 text-right font-medium">Gross profit</th>
+                          <th className="pb-2 text-right font-medium">Margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {view.finance.pnl_trend.slice(-6).map((row) => (
+                          <tr key={row.month} className="border-b border-gray-100 last:border-b-0">
+                            <td className="py-2 pr-3 text-navy">{pnlMonthLabel(row.month)}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(num(row.income))}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(num(row.cogs))}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums font-medium">{formatMoney(num(row.gross_profit))}</td>
+                            <td className="py-2 text-right tabular-nums">{pnlMarginPct(row)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No monthly P&amp;L rows have been synced for the trailing window yet.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <DecisionCard card={decisionMargin} />
+            <DecisionCard card={decisionCash} />
+          </>
+        ) : (
+          <FinancialEmptyState>
+            U1Dynamics P&amp;L data is not connected for this deployment. Set
+            <code className="mx-1 font-mono">U1D_FINANCE_DATABASE_URL</code>
+            on the app service to enable the financial section.
+          </FinancialEmptyState>
+        )}
       </SectionCard>
 
       {/* 4. Customer intelligence */}
       <SectionCard
         title="Customer intelligence"
+        subtitle="Volume-based view only. Per-customer revenue and margin are pending data-pipeline verification (invoice-line reconciliation in progress) — see the data-integrity disclosure below."
         meta={`Top ${view.topCustomers.length}`}
       >
         {/* Concentration strip */}
@@ -477,6 +569,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
             <MoversBlock title="Customers decreasing materially" tone="warn" rows={view.customerMovers.topDecliners} />
           </div>
         )}
+        <DecisionCard card={decisionCustomer} />
       </SectionCard>
 
       {/* 5. Product / package mix */}
@@ -660,6 +753,8 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
             </dl>
           </div>
         )}
+
+        <DataIntegrityDisclosure finance={view.finance} hasDiscrepancy={view.activeFile?.has_total_discrepancy ?? false} />
       </SectionCard>
 
       {/* Send / distribution history */}
@@ -769,18 +864,57 @@ function FinancialMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-const FORECAST_FLAG: Record<ForecastVarianceFlag, { label: string; className: string }> = {
-  favorable: { label: "Favorable", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  unfavorable: { label: "Unfavorable", className: "border-red-200 bg-red-50 text-red-800" },
-  flat: { label: "Flat", className: "border-gray-200 bg-white text-gray-700" },
+const DECISION_TONE: Record<DecisionTone, string> = {
+  neutral: "border-navy/40 bg-navy/[0.04] text-navy",
+  attention: "border-amber-400 bg-amber-50 text-amber-900",
+  urgent: "border-red-400 bg-red-50 text-red-900",
 };
 
-function ForecastFlag({ flag }: { flag: ForecastVarianceFlag }) {
-  const badge = FORECAST_FLAG[flag];
+/** "Decision for Management" card — mirrors the per-section card in the v2 deck. */
+function DecisionCard({ card }: { card: DecisionCardData | null }) {
+  if (!card) return null;
   return (
-    <span className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${badge.className}`}>
-      {badge.label}
-    </span>
+    <div className={`mt-5 rounded-sm border border-l-4 px-4 py-3 ${DECISION_TONE[card.tone]}`}>
+      <div className="text-[10px] uppercase tracking-[0.16em] font-bold opacity-80">{card.title}</div>
+      <p className="mt-1 text-sm leading-relaxed">{card.body}</p>
+    </div>
+  );
+}
+
+/** Data-integrity disclosure — mirrors slide 10 of the v2 deck. */
+function DataIntegrityDisclosure({ finance, hasDiscrepancy }: { finance: BoardFinanceOverlay | null; hasDiscrepancy: boolean }) {
+  const lines: string[] = [
+    "Volume metrics (gallons, customer and package counts, intercompany vs external split) are sourced from U1Dynamics' own validated and locked dataset. Authoritative.",
+  ];
+  if (finance) {
+    const a = finance.sync_assessment;
+    const freshness = a.worst_status === "ok"
+      ? "All finance sync jobs current."
+      : a.worst_status === "stale"
+        ? `${a.jobs_stale} of ${a.total_jobs} sync jobs stale (>24h).`
+        : `${a.jobs_error} sync job(s) in error state — investigate before relying on the numbers.`;
+    lines.push(
+      "Revenue, COGS, gross margin, and net income are sourced from the QuickBooks canonical P&L (monthly_pnl, accrual basis). Authoritative.",
+      "AR / AP aging is sourced from QuickBooks aging reports. Authoritative.",
+      `Data freshness: ${freshness}`,
+      "Per-customer revenue, per-product margin, and channel-mix dollar splits are pending data-pipeline verification (invoice-line reconciliation in progress). Volume-side per-customer analysis remains authoritative.",
+    );
+  } else {
+    lines.push(
+      "Financial overlay (revenue, margin, working capital) is not connected for this deployment. Set U1D_FINANCE_DATABASE_URL to enable it.",
+      "Per-customer revenue and margin analyses are deferred until the data pipeline is verified.",
+    );
+  }
+  if (hasDiscrepancy) {
+    lines.push("The source TOTAL row was flagged with a discrepancy. Volume facts use the reconstructed per-customer sum, not the source TOTAL.");
+  }
+  return (
+    <div className="mt-5 pt-4 border-t border-gray-200">
+      <h3 className="text-[11px] uppercase tracking-wider text-gray-500 mb-2 font-semibold">Data integrity disclosure</h3>
+      <ul className="space-y-1.5 text-xs text-gray-700 leading-relaxed list-disc list-inside">
+        {lines.map((l, i) => <li key={i}>{l}</li>)}
+      </ul>
+    </div>
   );
 }
 
@@ -815,7 +949,7 @@ function TrendBars({ title, rows }: { title: string; rows: { period_year: number
       <h3 className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">{title}</h3>
       <div className="flex items-end gap-1 h-32">
         {rows.map((r) => (
-          <div key={`${r.period_year}-${r.period_month}`} className="flex-1 flex flex-col items-center"
+          <div key={`${r.period_year}-${r.period_month}`} className="flex-1 flex flex-col items-center justify-end h-full"
             title={`${r.label}: ${fmtNum(r.total_gallons)} gal${r.is_locked ? "" : " (not locked)"}`}>
             <div className={`w-full ${r.is_locked ? "bg-navy" : "bg-white border border-navy/40"}`}
               style={{ height: `${(r.total_gallons / max) * 100}%`, minHeight: r.total_gallons > 0 ? "2px" : "0" }} />
