@@ -10,6 +10,13 @@
  */
 import type { BoardPeriodView } from "./types";
 import type { MixSliceRow } from "./mix";
+import type {
+  MonthlyPnl,
+  PnlAggregate,
+  WorkingCapitalSnapshot,
+  SyncHealthRow,
+} from "../finance/types";
+import type { SyncHealthAssessment } from "../finance/get-sync-health";
 
 export type ExecMetricSet = {
   total_gallons: number;
@@ -66,6 +73,33 @@ export type ExecMoverRow = {
   prior: number;
   delta_gallons: number;
   delta_pct: number | null;
+};
+
+
+/**
+ * PR 012B — finance overlay attached to the executive dashboard.
+ *
+ * Null when:
+ *   - U1D_FINANCE_DATABASE_URL is not set (local dev / unconfigured), or
+ *   - the read pool throws and safeQuery returns empty for all helpers, or
+ *   - the period has no monthly_pnl row yet (sync hasn't caught up).
+ *
+ * Downstream callers must check for null and render the "Finance data not
+ * available for this period" banner instead of fabricating numbers.
+ */
+export type BoardFinanceOverlay = {
+  /** Single canonical P&L for the period (this month). null if not synced. */
+  current: MonthlyPnl | null;
+  /** Trailing 12 months ending at this period (sums + derived margin pct). */
+  trailing_12m: PnlAggregate;
+  /** Per-month rows for the chart (12 months ASC, ending at this period). */
+  pnl_trend: MonthlyPnl[];
+  /** AR/AP-derived working capital snapshot. */
+  working_capital: WorkingCapitalSnapshot;
+  /** Per-job sync state — used by data-freshness banner. */
+  sync_jobs: SyncHealthRow[];
+  /** Rolled-up freshness assessment (ok / stale / error). */
+  sync_assessment: SyncHealthAssessment;
 };
 
 export type BoardExecutiveDashboard = {
@@ -125,4 +159,8 @@ export type BoardExecutiveDashboard = {
   // ---- Close quality / audit ----
   alertSummary: BoardPeriodView["alertSummary"];
   lockHistory: BoardPeriodView["lockHistory"];
+
+  // ---- Finance overlay (PR 012B) ----
+  /** Canonical money view from u1p_finance. null if not configured / unreachable / no data. */
+  finance: BoardFinanceOverlay | null;
 };

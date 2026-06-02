@@ -9,11 +9,12 @@
  * Sections (board-grade order):
  *   1. Executive snapshot
  *   2. Volume trends (6 + 12 month)
- *   3. Customer intelligence (top + concentration + movers + intercompany)
- *   4. Product / package mix (top + category mix + movers)
- *   5. Operational narrative (operator notes — capacity/supply/quality)
- *   6. Management attention (initiatives + risks)
- *   7. Close quality & audit (alerts + lock history + provenance)
+ *   3. Financial performance (P&L + forecast contract)
+ *   4. Customer intelligence (top + concentration + movers + intercompany)
+ *   5. Product / package mix (top + category mix + movers)
+ *   6. Operational narrative (operator notes — capacity/supply/quality)
+ *   7. Management attention (initiatives + risks)
+ *   8. Close quality & audit (alerts + lock history + provenance)
  *
  * Distribution + send history sections from PR 004D are preserved.
  */
@@ -26,6 +27,8 @@ import { SectionCard } from "@/components/layout/section-card";
 import { KpiCard } from "@/components/layout/kpi-card";
 import { getPool } from "@/lib/db-pool";
 import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
+import { getBoardFinancialLayer } from "@/lib/board/get-board-financial-layer";
+import type { BoardFinancialLayer, ForecastVarianceFlag } from "@/lib/board/financial-types";
 import { generateBoardNarrative, type NarrativeSeverity } from "@/lib/board/narrative";
 import { listDistributionLists } from "@/lib/distribution/list-distribution-lists";
 import { listBoardDeckSends } from "@/lib/distribution/list-board-deck-sends";
@@ -60,6 +63,12 @@ function formatSigned(n: number | null): string {
   return `${sign}${fmtNum(n)}`;
 }
 
+function formatMoney(n: number | null): string {
+  if (n === null) return "—";
+  const sign = n < 0 ? "-" : "";
+  return `${sign}$${fmtNum(Math.abs(n))}`;
+}
+
 function DeltaText({ value }: { value: number | null }) {
   if (value === null) return <span className="text-gray-400">—</span>;
   const positive = value >= 0;
@@ -87,12 +96,14 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   }
 
   let view: Awaited<ReturnType<typeof getBoardExecutiveDashboard>>;
+  let financial: BoardFinancialLayer;
   let distributionLists: Awaited<ReturnType<typeof listDistributionLists>> = [];
   let recentSends: Awaited<ReturnType<typeof listBoardDeckSends>> = [];
   try {
     const pool = getPool();
-    [view, distributionLists, recentSends] = await Promise.all([
+    [view, financial, distributionLists, recentSends] = await Promise.all([
       getBoardExecutiveDashboard(pool, year, month),
+      getBoardFinancialLayer(year, month),
       listDistributionLists(pool),
       listBoardDeckSends(pool, year, month, 10),
     ]);
@@ -311,7 +322,93 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </div>
       </SectionCard>
 
-      {/* 3. Customer intelligence */}
+      {/* 3. Financial performance */}
+      <SectionCard
+        title="Financial Performance"
+        subtitle={`U1Dynamics finance bridge. Connector company_id: ${financial.companyId}.`}
+      >
+        {financial.pnl ? (
+          <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard label="Revenue" value={formatMoney(financial.pnl.revenue)} sub="monthly P&L" tone="navy" />
+            <KpiCard label="COGS" value={formatMoney(financial.pnl.cogs)} sub="monthly P&L" tone="neutral" />
+            <KpiCard label="Gross profit" value={formatMoney(financial.pnl.grossProfit)} sub="revenue less COGS" tone={financial.pnl.grossProfit >= 0 ? "ok" : "warn"} />
+            <KpiCard
+              label="Gross margin"
+              value={financial.pnl.grossMarginPct !== null ? fmtPct(financial.pnl.grossMarginPct, 1, false) : "—"}
+              sub="gross profit ÷ revenue"
+              tone={financial.pnl.grossMarginPct === null ? "neutral" : financial.pnl.grossMarginPct >= 0 ? "ok" : "warn"}
+            />
+          </div>
+        ) : (
+          <FinancialEmptyState>
+            U1Dynamics P&amp;L data is not yet connected for this board period.
+          </FinancialEmptyState>
+        )}
+
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                Forecast vs actual
+              </h3>
+              {financial.forecastActual && <ForecastFlag flag={financial.forecastActual.flag} />}
+            </div>
+            {financial.forecastActual ? (
+              <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
+                <FinancialMetric label="Forecast cost" value={formatMoney(financial.forecastActual.forecastCost)} />
+                <FinancialMetric label="Actual cost" value={formatMoney(financial.forecastActual.actualCost)} />
+                <FinancialMetric label="Variance $" value={formatMoney(financial.forecastActual.varianceDollars)} />
+                <FinancialMetric
+                  label="Variance %"
+                  value={financial.forecastActual.variancePct !== null ? fmtPct(financial.forecastActual.variancePct) : "—"}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Forecast vs actual cost data is not yet available for this board period.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+            <h3 className="mb-3 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+              Monthly trend
+            </h3>
+            {financial.monthlyTrend.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-500">
+                      <th className="pb-2 pr-3 text-left font-medium">Month</th>
+                      <th className="pb-2 pr-3 text-right font-medium">Revenue</th>
+                      <th className="pb-2 pr-3 text-right font-medium">COGS</th>
+                      <th className="pb-2 pr-3 text-right font-medium">Gross profit</th>
+                      <th className="pb-2 text-right font-medium">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financial.monthlyTrend.slice(-6).map((row) => (
+                      <tr key={row.period} className="border-b border-gray-100 last:border-b-0">
+                        <td className="py-2 pr-3 text-navy">{row.label}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(row.revenue)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(row.cogs)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums font-medium">{formatMoney(row.grossProfit)}</td>
+                        <td className="py-2 text-right tabular-nums">{row.grossMarginPct !== null ? fmtPct(row.grossMarginPct, 1, false) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Monthly financial trend data will appear here when connector rows are available.
+              </p>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* 4. Customer intelligence */}
       <SectionCard
         title="Customer intelligence"
         meta={`Top ${view.topCustomers.length}`}
@@ -382,7 +479,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         )}
       </SectionCard>
 
-      {/* 4. Product / package mix */}
+      {/* 5. Product / package mix */}
       <SectionCard
         title="Product / package mix"
         meta={`Top ${view.topPackages.length}`}
@@ -454,7 +551,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         )}
       </SectionCard>
 
-      {/* 5. Operational narrative + 6. Management attention */}
+      {/* 6. Operational narrative + 7. Management attention */}
       {view.operatorNotes && (
         <>
           <SectionCard
@@ -503,7 +600,7 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </>
       )}
 
-      {/* 7. Operational alerts */}
+      {/* 8. Operational alerts */}
       <SectionCard
         title="Operational Alerts"
         subtitle="Close quality, alert resolution, and audit trail for the locked period."
@@ -652,6 +749,38 @@ function SmallStat({ label, value, sub, tone }: { label: string; value: string; 
       <div className="font-heading text-xl font-bold mt-1 leading-none tabular-nums">{value}</div>
       {sub && <div className="text-[10px] opacity-70 mt-auto pt-2 truncate">{sub}</div>}
     </div>
+  );
+}
+
+function FinancialEmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-sm border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+      {children}
+    </div>
+  );
+}
+
+function FinancialMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
+      <div className="mt-1 font-heading text-lg font-bold text-navy tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+const FORECAST_FLAG: Record<ForecastVarianceFlag, { label: string; className: string }> = {
+  favorable: { label: "Favorable", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  unfavorable: { label: "Unfavorable", className: "border-red-200 bg-red-50 text-red-800" },
+  flat: { label: "Flat", className: "border-gray-200 bg-white text-gray-700" },
+};
+
+function ForecastFlag({ flag }: { flag: ForecastVarianceFlag }) {
+  const badge = FORECAST_FLAG[flag];
+  return (
+    <span className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${badge.className}`}>
+      {badge.label}
+    </span>
   );
 }
 

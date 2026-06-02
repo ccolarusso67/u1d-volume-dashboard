@@ -35,6 +35,8 @@ import { findMaterialMovers, type MoverOutputRow } from "./movers";
 import { computeConcentration } from "./concentration";
 import { computeCategoryMix } from "./mix";
 import { aggregateYtd } from "./ytd";
+import { loadFinanceOverlay } from "./load-finance-overlay";
+import type { BoardFinanceOverlay } from "./executive-types";
 
 const TOP_N_CUSTOMERS = 10;
 const TOP_N_PACKAGES = 10;
@@ -260,10 +262,26 @@ function deltaSet(current: number, prior: number | null): { delta_gallons: numbe
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional dependency injection for tests. In production all callers omit
+ * this — the default loader uses getFinancePool() which respects the
+ * U1D_FINANCE_DATABASE_URL env var and gracefully degrades to null when
+ * the env var is missing.
+ */
+export type GetBoardExecutiveDashboardOpts = {
+  /** Override the finance overlay loader. Tests pass `async () => null`
+   *  to keep behavior identical to pre-PR-012B. */
+  financeOverlayLoader?: (
+    year: number,
+    month: number
+  ) => Promise<BoardFinanceOverlay | null>;
+};
+
 export async function getBoardExecutiveDashboard(
   pool: Pool,
   year: number,
-  month: number
+  month: number,
+  opts: GetBoardExecutiveDashboardOpts = {}
 ): Promise<BoardExecutiveDashboard> {
   if (!Number.isInteger(year) || year < 2020 || year > 2100) {
     throw new RangeError(`getBoardExecutiveDashboard: invalid year ${year}`);
@@ -538,6 +556,10 @@ export async function getBoardExecutiveDashboard(
       }
     : null;
 
+  // PR 012B — finance overlay (null if not configured / unreachable / no data).
+  const financeLoader = opts.financeOverlayLoader ?? loadFinanceOverlay;
+  const finance = await financeLoader(year, month);
+
   return {
     period: periodInfo,
     readiness: { ready, blockers },
@@ -592,6 +614,7 @@ export async function getBoardExecutiveDashboard(
       version_no: e.version_no,
       filename: e.filename,
     })),
+    finance,
   };
 }
 

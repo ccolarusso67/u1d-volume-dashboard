@@ -119,6 +119,7 @@ function makeDashboard(overrides?: Partial<BoardExecutiveDashboard>): BoardExecu
       pending_alerts_total: 0,
     },
     lockHistory: [],
+    finance: null,
   };
 
   return { ...base, ...(overrides ?? {}) };
