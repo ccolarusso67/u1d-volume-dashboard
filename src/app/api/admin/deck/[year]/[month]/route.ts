@@ -24,12 +24,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { requireAdminSession } from "@/lib/auth/require-admin";
 import { getPool } from "@/lib/db-pool";
-import { getBoardPeriod } from "@/lib/board/get-board-period";
+import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
 import {
-  generateMonthlyDeck,
-  deckFilename,
-  DeckNotReadyError,
-} from "@/lib/deck/generate-monthly-deck";
+  generateMonthlyDeckV2,
+  deckFilenameV2,
+} from "@/lib/deck/generate-monthly-deck-v2";
 
 type Params = { year: string; month: string };
 
@@ -53,11 +52,11 @@ export async function GET(
     );
   }
 
-  let board: Awaited<ReturnType<typeof getBoardPeriod>>;
+  let view: Awaited<ReturnType<typeof getBoardExecutiveDashboard>>;
   try {
-    board = await getBoardPeriod(getPool(), year, month);
+    view = await getBoardExecutiveDashboard(getPool(), year, month);
   } catch (err) {
-    console.error("[deck] getBoardPeriod failed:", err);
+    console.error("[deck] getBoardExecutiveDashboard failed:", err);
     return NextResponse.json(
       { ok: false, error: "internal_error", message: err instanceof Error ? err.message : "unknown" },
       { status: 500 }
@@ -67,20 +66,20 @@ export async function GET(
   // Readiness gate — the generator also gates defensively, but we want
   // a clean 409 + JSON contract here rather than letting the generator
   // throw on a non-locked period.
-  if (!board.readiness.ready || board.period.status !== "locked") {
+  if (!view.readiness.ready || view.period.status !== "locked") {
     return NextResponse.json(
       {
         ok: false,
         error: "period_not_ready",
-        blockers: board.readiness.blockers,
+        blockers: view.readiness.blockers,
       },
       { status: 409 }
     );
   }
 
   try {
-    const buffer = await generateMonthlyDeck(board);
-    const filename = deckFilename(board);
+    const buffer = await generateMonthlyDeckV2(view);
+    const filename = deckFilenameV2(view);
 
     return new NextResponse(
       // `body` accepts a Buffer in Next.js route handlers (Node runtime).
@@ -98,12 +97,6 @@ export async function GET(
       }
     );
   } catch (err) {
-    if (err instanceof DeckNotReadyError) {
-      return NextResponse.json(
-        { ok: false, error: "period_not_ready", blockers: err.blockers },
-        { status: 409 }
-      );
-    }
     console.error("[deck] generation failed:", err);
     return NextResponse.json(
       { ok: false, error: "internal_error", message: err instanceof Error ? err.message : "unknown" },
