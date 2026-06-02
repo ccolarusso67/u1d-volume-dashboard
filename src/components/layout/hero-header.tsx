@@ -52,8 +52,8 @@ export function HeroHeader({
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="flex items-start gap-5 flex-1 min-w-0">
             {showLogo && (
-              <div className="flex-shrink-0 hidden sm:block">
-                <U1DLogo size={44} tone="light" />
+              <div className="flex-shrink-0 hidden sm:block bg-white rounded-md px-3 py-2 shadow-sm">
+                <U1DLogo size={40} useRaster />
               </div>
             )}
             <div className="min-w-0">
