@@ -1,6 +1,26 @@
 import { query, queryOne } from "../db";
 import { categorizeFamily, type CategoryLabel } from "./category";
 
+// ---------------------------------------------------------------------------
+// Active-version facts (BUG-REGISTER HIGH-2).
+//
+// After migration 005, volume_fact retains EVERY uploaded version's rows per
+// period. Aggregating volume_fact directly double-counts superseded versions
+// the moment a period has > 1 version. This subselect keeps only the active
+// version per period — mirroring the filter the board path already uses.
+// Drop-in replacement for `u1d_ops.volume_fact`; exposes the same columns, so
+// downstream column references (gallons, customer_key, package_key,
+// period_year, period_month) are unchanged. Switch to `f.locked_at IS NOT
+// NULL` if a surface must be board-grade rather than operational.
+// ---------------------------------------------------------------------------
+const ACTIVE_VOLUME_FACT = `(
+    SELECT vf.fact_id, vf.file_id, vf.period_year, vf.period_month,
+           vf.customer_key, vf.package_key, vf.gallons
+      FROM u1d_ops.volume_fact vf
+      JOIN u1d_ops.volume_files f ON f.file_id = vf.file_id
+     WHERE f.is_active = TRUE
+  )`;
+
 export type MonthlyKPI = {
   period_year: number;
   period_month: number;
@@ -70,10 +90,10 @@ export async function getCustomerYoYForMonth(
         ELSE NULL END AS delta_pct
     FROM u1d_ops.customers c
     LEFT JOIN (SELECT customer_key, SUM(gallons) AS gallons
-      FROM u1d_ops.volume_fact WHERE period_year = $1 AND period_month = $2
+      FROM ${ACTIVE_VOLUME_FACT} v WHERE period_year = $1 AND period_month = $2
       GROUP BY customer_key) curr USING (customer_key)
     LEFT JOIN (SELECT customer_key, SUM(gallons) AS gallons
-      FROM u1d_ops.volume_fact WHERE period_year = $1 - 1 AND period_month = $2
+      FROM ${ACTIVE_VOLUME_FACT} v WHERE period_year = $1 - 1 AND period_month = $2
       GROUP BY customer_key) prior USING (customer_key)
     WHERE COALESCE(curr.gallons, 0) > 0 OR COALESCE(prior.gallons, 0) > 0
     ORDER BY COALESCE(curr.gallons, 0) DESC
@@ -98,14 +118,14 @@ export async function getPackageMixForMonth(
     `
     WITH month_total AS (
       SELECT NULLIF(SUM(gallons), 0)::float8 AS total
-      FROM u1d_ops.volume_fact
+      FROM ${ACTIVE_VOLUME_FACT} v
       WHERE period_year = $1 AND period_month = $2
     )
     SELECT
       p.package_key, p.display_name, p.family,
       SUM(vf.gallons)::float8 AS gallons,
       (SUM(vf.gallons) / (SELECT total FROM month_total))::float8 AS pct_of_month
-    FROM u1d_ops.volume_fact vf
+    FROM ${ACTIVE_VOLUME_FACT} vf
     JOIN u1d_ops.packages p USING (package_key)
     WHERE vf.period_year = $1 AND vf.period_month = $2
     GROUP BY p.package_key, p.display_name, p.family
@@ -140,10 +160,10 @@ export async function getPackageYoYForMonth(
         ELSE NULL END AS delta_pct
     FROM u1d_ops.packages p
     LEFT JOIN (SELECT package_key, SUM(gallons) AS gallons
-      FROM u1d_ops.volume_fact WHERE period_year = $1 AND period_month = $2
+      FROM ${ACTIVE_VOLUME_FACT} v WHERE period_year = $1 AND period_month = $2
       GROUP BY package_key) curr USING (package_key)
     LEFT JOIN (SELECT package_key, SUM(gallons) AS gallons
-      FROM u1d_ops.volume_fact WHERE period_year = $1 - 1 AND period_month = $2
+      FROM ${ACTIVE_VOLUME_FACT} v WHERE period_year = $1 - 1 AND period_month = $2
       GROUP BY package_key) prior USING (package_key)
     WHERE COALESCE(curr.gallons, 0) > 0 OR COALESCE(prior.gallons, 0) > 0
     ORDER BY delta_gallons DESC
@@ -165,18 +185,18 @@ export async function getYTDComparison(
   const row = await queryOne<YTDComparison>(
     `
     SELECT
-      COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+      COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
         WHERE period_year = $1 AND period_month <= $2), 0)::float8 AS current_ytd,
-      COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+      COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
         WHERE period_year = $1 - 1 AND period_month <= $2), 0)::float8 AS prior_ytd,
-      CASE WHEN COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+      CASE WHEN COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
         WHERE period_year = $1 - 1 AND period_month <= $2), 0) > 0
       THEN (
-        (COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+        (COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
           WHERE period_year = $1 AND period_month <= $2), 0) -
-         COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+         COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
           WHERE period_year = $1 - 1 AND period_month <= $2), 0)) /
-        COALESCE((SELECT SUM(gallons) FROM u1d_ops.volume_fact
+        COALESCE((SELECT SUM(gallons) FROM ${ACTIVE_VOLUME_FACT} v
           WHERE period_year = $1 - 1 AND period_month <= $2), 0)
       )::float8 ELSE NULL END AS delta_pct
   `,
@@ -215,7 +235,7 @@ export async function getMonthlyCategoryTrend(n: number): Promise<CategoryTrendR
         ELSE 'Other'
       END AS category,
       SUM(vf.gallons)::float8 AS gallons
-    FROM u1d_ops.volume_fact vf
+    FROM ${ACTIVE_VOLUME_FACT} vf
     JOIN u1d_ops.packages p USING (package_key)
     WHERE (vf.period_year, vf.period_month) IN (
       SELECT period_year, period_month
