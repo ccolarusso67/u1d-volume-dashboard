@@ -29,10 +29,10 @@ export function getFinancePool(): Pool {
     g.__u1dFinancePool = new Pool({
       connectionString: process.env.U1D_FINANCE_DATABASE_URL,
       max: 5,
-      ssl:
-        process.env.NODE_ENV === "production"
-          ? { rejectUnauthorized: false }
-          : undefined,
+      ssl: { rejectUnauthorized: false },
+
+
+
     });
   }
   return g.__u1dFinancePool;
