@@ -243,10 +243,17 @@ export async function parseVolumeFile(
       return;
     }
     if (!headerRow) return;
+    // Stop at the first TOTAL row. Everything below it in the SUMMARY sheet
+    // is a comparison/commentary block (prior-year actuals, MoM deltas) that
+    // repeats the same customer labels. Reading it emits duplicate
+    // (customer, package) facts and violates volume_fact_file_uk. The
+    // authoritative current-month data is the single block between the
+    // CHANNEL header and the first TOTAL row.
+    if (totalRow) return;
     const label = normalizeLabel(first);
     if (!label) return;
     if (label === "TOTAL") {
-      if (!totalRow) totalRow = row;
+      totalRow = row;
       return;
     }
     bodyRows.push({ rawLabel: label, row });
