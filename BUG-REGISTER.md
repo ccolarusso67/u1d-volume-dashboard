@@ -14,6 +14,25 @@ Severity is about board-grade correctness and data integrity, not style.
 - **LOW** — cleanup / docs / flaky tests.
 - **VERIFY** — could not be checked in this environment; must be confirmed on a machine with the DB and the test runner.
 
+## Resolution status (as of this session)
+
+| Item | Status | Commit |
+|---|---|---|
+| HIGH-1 mv_monthly_totals double-count | ✅ Fixed (needs `db:migrate` + verify) | migration 010 |
+| HIGH-2 public-page volume_fact queries | ✅ Fixed | `monthly.ts` ACTIVE_VOLUME_FACT |
+| MEDIUM-1 deck channel split | ✅ Fixed | email path → v2 |
+| MEDIUM-2 family categorization drift | ✅ Fixed | SQL `CASE` generated from `CATEGORY_MAP` |
+| LOW-1 stale CLAUDE.md | ✅ Fixed | doc updated |
+| LOW-2 unused-var lint | ✅ Fixed | lint now clean |
+| LOW-3 flaky formatDate | ✅ Fixed | `formatDate` pinned to UTC |
+| DATA-LOSS #114 Railway volume | ⏳ Open — your infra task | — |
+| SECURITY credential rotation | ⏳ Open — your task | — |
+| UPSTREAM InvoiceSyncJob bugs | ⏳ Open — separate repo | — |
+
+All code items are typecheck- and lint-clean here, but the **test suite and the
+schema migration were not run in this environment** — validate locally before
+relying on the HIGH-1 fix (see below).
+
 ## Verification status (what was and wasn't run)
 
 | Gate | Result |

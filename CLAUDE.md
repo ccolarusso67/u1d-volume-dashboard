@@ -204,8 +204,8 @@ board report (Phase 2+)
 | Task | Where to look | Watch out for |
 |---|---|---|
 | Add a new package | `db/migrations/002_seed_catalogs.sql` + `volume-parser.ts` `PACKAGE_KEYS` | Must update both. Container_type and family enums are constrained. |
-| Add a new customer | `002_seed_catalogs.sql` + `volume-parser.ts` `CUSTOMER_KEYS` + canonicalization | Parser uses `startsWith` — fragile. Add an alias map. |
-| Touch the dashboard's 6-month trend | `getMonthlyCategoryTrend` in `src/lib/queries/monthly.ts` | Family enum is lowercase (`'coolant'`, `'washer_fluid'`, `'def'`) — current code has a known bug comparing to uppercase. |
+| Add a new customer | `002_seed_catalogs.sql` + `volume-parser.ts` `CUSTOMER_KEYS` + canonicalization | Matching uses an uppercased alias-map lookup (`customer_aliases`), not `startsWith` — add the raw label to the alias map. |
+| Touch the dashboard's 6-month trend | `getMonthlyCategoryTrend` in `src/lib/queries/monthly.ts` | Family enum is lowercase (`'oil'`, `'coolant'`, `'washer_fluid'`, `'def'`). The SQL `CASE` is generated from `CATEGORY_MAP` in `category.ts` (single source of truth) — change the map, not the query. |
 | Add a migration | `db/migrations/NNN_*.sql` | Each file must have its own `BEGIN; ... COMMIT;`. Migrator does not wrap. |
 | Wire a new chart | `src/components/charts/*` | Must be `"use client"`. Server pages pivot data and pass to client component. |
 | Refresh MVs after a manual DB change | `SELECT u1d_ops.refresh_views();` | Order matters; the helper handles it. First-ever refresh of a new MV cannot use CONCURRENTLY. |

@@ -58,6 +58,7 @@ export function formatDate(value: string | null | undefined): string {
   if (isNaN(d.valueOf())) return "—";
   return d.toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "2-digit",
+    timeZone: "UTC",
   });
 }
 

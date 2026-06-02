@@ -65,7 +65,6 @@ const FONT_BODY = "Calibri";
 
 // 16:9 wide layout: 13.33" x 7.5"
 const SLIDE_W = 13.33;
-const SLIDE_H = 7.5;
 const MARGIN_X = 0.5;
 const HEADER_Y = 0.4;
 const FOOTER_Y = 7.05;

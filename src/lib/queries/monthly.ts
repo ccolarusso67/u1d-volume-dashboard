@@ -1,5 +1,5 @@
 import { query, queryOne } from "../db";
-import { categorizeFamily, type CategoryLabel } from "./category";
+import { CATEGORY_MAP, type PackageFamily, type CategoryLabel } from "./category";
 
 // ---------------------------------------------------------------------------
 // Active-version facts (BUG-REGISTER HIGH-2).
@@ -20,6 +20,17 @@ const ACTIVE_VOLUME_FACT = `(
       JOIN u1d_ops.volume_files f ON f.file_id = vf.file_id
      WHERE f.is_active = TRUE
   )`;
+
+// Build the family -> category CASE from CATEGORY_MAP (BUG-REGISTER MEDIUM-2)
+// so the SQL trend query and the TS categorizeFamily() helper share ONE
+// definition and can never drift. Keys/values are hardcoded catalog enum
+// tokens, never user input, so direct interpolation is safe.
+function familyCategoryCaseSql(familyCol: string): string {
+  const whens = (Object.keys(CATEGORY_MAP) as PackageFamily[])
+    .map((fam) => `WHEN '${fam}' THEN '${CATEGORY_MAP[fam]}'`)
+    .join("\n        ");
+  return `CASE ${familyCol}\n        ${whens}\n        ELSE 'Other'\n      END`;
+}
 
 export type MonthlyKPI = {
   period_year: number;
@@ -222,18 +233,9 @@ export async function getMonthlyCategoryTrend(n: number): Promise<CategoryTrendR
     SELECT
       vf.period_year::int  AS period_year,
       vf.period_month::int AS period_month,
-      -- MUST mirror categorizeFamily() in src/lib/queries/category.ts.
-      -- The family enum is constrained to lowercase tokens in the catalog
-      -- (PR 002 — Board Accuracy Hotfix). Previous version compared against
-      -- uppercase 'COOL' / 'WW' / 'DEF' and silently bucketed those families
-      -- as 'Other' on the 6-month trend chart.
-      CASE p.family
-        WHEN 'oil'          THEN 'Oil'
-        WHEN 'coolant'      THEN 'Coolant'
-        WHEN 'washer_fluid' THEN 'WW'
-        WHEN 'def'          THEN 'DEF'
-        ELSE 'Other'
-      END AS category,
+      -- Generated from CATEGORY_MAP (single source of truth) via
+      -- familyCategoryCaseSql() above, so SQL and TS cannot drift.
+      ${familyCategoryCaseSql("p.family")} AS category,
       SUM(vf.gallons)::float8 AS gallons
     FROM ${ACTIVE_VOLUME_FACT} vf
     JOIN u1d_ops.packages p USING (package_key)

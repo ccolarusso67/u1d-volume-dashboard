@@ -27,7 +27,7 @@
  * during the rollover.
  */
 import PptxGenJS from "pptxgenjs";
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import path from "path";
 import type {
   BoardExecutiveDashboard,
@@ -49,12 +49,11 @@ import {
   DECK_FONT_BODY as FB,
 } from "./layouts";
 import {
-  formatGallons, formatPct, formatDelta,
+  formatGallons, formatDelta,
   formatDate, formatDateTime,
 } from "./format";
 
 const SLIDE_W = 13.33;
-const SLIDE_H = 7.5;
 const MARGIN_X = 0.5;
 const TOTAL_SLIDES = 10;
 

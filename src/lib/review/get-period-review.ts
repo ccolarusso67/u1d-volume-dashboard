@@ -18,10 +18,8 @@
  */
 import type { Pool, QueryResultRow } from "pg";
 import { getOperatorNotes } from "../operator-notes/get-operator-notes";
-import type { OperatorNotes } from "../operator-notes/types";
 import { evaluateReadiness } from "./readiness";
 import { listPeriodEvents } from "./list-period-events";
-import type { PeriodLockEventView } from "./period-events-types";
 import type {
   PeriodReview,
   ActiveVolumeFile,
