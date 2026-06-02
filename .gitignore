@@ -26,3 +26,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Office temp/lock files
+~\$*
+.~lock.*#
