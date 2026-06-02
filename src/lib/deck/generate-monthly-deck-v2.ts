@@ -50,7 +50,7 @@ import {
 } from "./layouts";
 import {
   formatGallons, formatDelta,
-  formatDate, formatDateTime,
+  formatDateTime,
 } from "./format";
 
 const SLIDE_W = 13.33;
@@ -129,44 +129,38 @@ function loadOptionalLogo(): LogoData {
 }
 
 function addHeroBand(slide: PptxGenJS.Slide, eyebrow: string, title: string, subtitle?: string) {
-  // Navy band 0..1.05
-  slide.addShape("rect", {
-    x: 0, y: 0, w: SLIDE_W, h: 1.05,
-    fill: { color: B.navy }, line: { color: B.navy, width: 0 },
-  });
-  // Red accent stripe at bottom of band
-  slide.addShape("rect", {
-    x: 0, y: 1.05, w: SLIDE_W, h: 0.05,
-    fill: { color: B.red }, line: { color: B.red, width: 0 },
-  });
-  slide.addText(eyebrow, {
-    x: MARGIN_X, y: 0.18, w: SLIDE_W - MARGIN_X * 2, h: 0.25,
-    fontFace: FB, fontSize: 9, bold: true, color: B.white, charSpacing: 2,
+  // Template style: white header — red kicker, navy title, slate subtitle,
+  // hairline rule. Keeps the ~0..1.25 footprint so content can start at ~1.3.
+  slide.addText(eyebrow.toUpperCase(), {
+    x: MARGIN_X, y: 0.30, w: SLIDE_W - MARGIN_X * 2, h: 0.24,
+    fontFace: FB, fontSize: 10, bold: true, color: B.red, charSpacing: 2,
   });
   slide.addText(title, {
-    x: MARGIN_X, y: 0.40, w: SLIDE_W - MARGIN_X * 2, h: 0.42,
-    fontFace: FT, fontSize: 24, bold: true, color: B.white,
+    x: MARGIN_X, y: 0.55, w: SLIDE_W - MARGIN_X * 2, h: 0.5,
+    fontFace: FT, fontSize: 23, bold: true, color: B.navy,
   });
   if (subtitle) {
     slide.addText(subtitle, {
-      x: MARGIN_X, y: 0.78, w: SLIDE_W - MARGIN_X * 2, h: 0.22,
-      fontFace: FB, fontSize: 11, italic: true, color: B.white,
+      x: MARGIN_X, y: 1.04, w: SLIDE_W - MARGIN_X * 2, h: 0.22,
+      fontFace: FB, fontSize: 11, color: B.bodyText,
     });
   }
+  // Hairline rule under the header
+  slide.addShape("rect", {
+    x: MARGIN_X, y: 1.24, w: SLIDE_W - MARGIN_X * 2, h: 0.012,
+    fill: { color: B.border }, line: { color: B.border, width: 0 },
+  });
 }
 
 function addFooter(slide: PptxGenJS.Slide, view: BoardExecutiveDashboard, pageNo: number) {
-  const lockTxt = view.period.locked_at
-    ? `Locked ${formatDate(view.period.locked_at)} · ${view.period.locked_by ?? "—"}`
-    : "Unlocked";
   slide.addText(
-    `U1Dynamics Manufacturing LLC · ${view.period.label} · ${lockTxt}`,
+    `U1Dynamics Manufacturing LLC  ·  ${view.period.label}  ·  Confidential`,
     {
       x: MARGIN_X, y: 7.15, w: SLIDE_W - MARGIN_X * 2 - 0.7, h: 0.25,
       fontFace: FB, fontSize: 8, color: B.mutedText,
     }
   );
-  slide.addText(`${pageNo} / ${TOTAL_SLIDES}`, {
+  slide.addText(String(pageNo).padStart(2, "0"), {
     x: SLIDE_W - MARGIN_X - 0.7, y: 7.15, w: 0.7, h: 0.25,
     fontFace: FB, fontSize: 8, color: B.mutedText, align: "right",
   });
@@ -192,65 +186,54 @@ function pctOf(n: number): string {
 
 function buildCoverV2(pptx: PptxGenJS, view: BoardExecutiveDashboard, logo: LogoData) {
   const slide = pptx.addSlide();
-  slide.background = { color: B.white };
+  // Full-bleed deep-navy cover (template style)
+  slide.background = { color: B.navyDeep };
+  const KICKER = "5E7FA3";   // muted slate-blue on navy
+  const SOFT = "9DB1C9";     // soft blue for secondary text
 
-  // Full-bleed navy band on the top half
-  slide.addShape("rect", {
-    x: 0, y: 0, w: SLIDE_W, h: 4.0,
-    fill: { color: B.navy }, line: { color: B.navy, width: 0 },
-  });
-  slide.addShape("rect", {
-    x: 0, y: 4.0, w: SLIDE_W, h: 0.06,
-    fill: { color: B.red }, line: { color: B.red, width: 0 },
-  });
-
+  // Logo (if configured) + wordmark, top-left
   if (logo.path && logo.ext) {
-    slide.addImage({ path: logo.path, x: MARGIN_X, y: 0.5, w: 1.2, h: 1.2 });
+    slide.addImage({ path: logo.path, x: MARGIN_X, y: 0.55, w: 1.7, h: 1.1 });
+  } else {
+    slide.addText("U1DYNAMICS", {
+      x: MARGIN_X, y: 0.7, w: 6, h: 0.4,
+      fontFace: FB, fontSize: 16, bold: true, color: B.white, charSpacing: 2,
+    });
+    slide.addShape("rect", {
+      x: MARGIN_X + 0.02, y: 1.18, w: 0.9, h: 0.035,
+      fill: { color: B.red }, line: { color: B.red, width: 0 },
+    });
   }
 
-  slide.addText("U1DYNAMICS MANUFACTURING LLC", {
-    x: MARGIN_X + (logo.path ? 1.5 : 0), y: 0.85, w: SLIDE_W - MARGIN_X * 2 - 1.5, h: 0.3,
-    fontFace: FB, fontSize: 11, bold: true, color: B.white, charSpacing: 3,
-  });
-  slide.addText("Board Operating Review", {
-    x: MARGIN_X + (logo.path ? 1.5 : 0), y: 1.25, w: SLIDE_W - MARGIN_X * 2 - 1.5, h: 0.7,
-    fontFace: FT, fontSize: 40, bold: true, color: B.white,
+  // Title block, lower-left
+  slide.addText("BOARD OPERATING REVIEW", {
+    x: MARGIN_X, y: 4.55, w: SLIDE_W - MARGIN_X * 2, h: 0.3,
+    fontFace: FB, fontSize: 12, bold: true, color: KICKER, charSpacing: 4,
   });
   slide.addText(view.period.label, {
-    x: MARGIN_X + (logo.path ? 1.5 : 0), y: 2.05, w: SLIDE_W - MARGIN_X * 2 - 1.5, h: 0.45,
-    fontFace: FT, fontSize: 26, color: B.white,
+    x: MARGIN_X - 0.03, y: 4.9, w: SLIDE_W - MARGIN_X * 2, h: 0.95,
+    fontFace: FT, fontSize: 52, bold: true, color: B.white,
   });
+  slide.addText("Decision deck for the Board of Directors", {
+    x: MARGIN_X, y: 5.95, w: SLIDE_W - MARGIN_X * 2, h: 0.3,
+    fontFace: FB, fontSize: 14, color: SOFT,
+  });
+
+  // Right-rail pull-quote (the central question)
   slide.addText(
-    view.period.locked_at
-      ? `Locked ${formatDateTime(view.period.locked_at)} · ${view.period.locked_by ?? "—"} · v${view.activeFile?.version_no ?? "—"}`
-      : "Locked period required to ship deck",
+    "The question is not whether we can make and ship.\nIt is whether we can turn volume into margin, cash, and resilience.",
     {
-      x: MARGIN_X + (logo.path ? 1.5 : 0), y: 2.55, w: SLIDE_W - MARGIN_X * 2 - 1.5, h: 0.25,
-      fontFace: FB, fontSize: 11, italic: true, color: B.white,
+      x: 8.7, y: 2.7, w: SLIDE_W - 8.7 - MARGIN_X, h: 1.6,
+      fontFace: FB, fontSize: 12, color: SOFT, valign: "top", lineSpacingMultiple: 1.15,
     }
   );
 
-  // Lower half — quick narrative pull-quote
-  const totalGal = view.currentMetrics.total_gallons;
-  const yoyText = view.priorYear?.delta_pct !== undefined && view.priorYear?.delta_pct !== null
-    ? formatDelta(view.priorYear.delta_pct)
-    : "no prior-year baseline";
-  const finText = view.finance?.trailing_12m
-    ? `Trailing 12M revenue ${moneyShort(view.finance.trailing_12m.income)} · gross margin ${pctOf(view.finance.trailing_12m.gross_margin_pct)} · net income ${moneyShort(view.finance.trailing_12m.net_income)}.`
-    : "Financial overlay not available for this period — see slide 10 for disclosure.";
-
+  // Footer
   slide.addText(
-    `${formatGallons(totalGal)} gallons this month · YoY ${yoyText}.\n${finText}`,
-    {
-      x: MARGIN_X, y: 4.5, w: SLIDE_W - MARGIN_X * 2, h: 1.8,
-      fontFace: FT, fontSize: 18, italic: true, color: B.darkText, valign: "top",
-    }
+    `U1Dynamics Manufacturing LLC  ·  ${view.period.label}  ·  Confidential`,
+    { x: MARGIN_X, y: 7.05, w: SLIDE_W - MARGIN_X * 2, h: 0.25,
+      fontFace: FB, fontSize: 9, color: KICKER }
   );
-
-  slide.addText(`Generated ${formatDateTime(new Date().toISOString())}`, {
-    x: MARGIN_X, y: 7.15, w: SLIDE_W - MARGIN_X * 2, h: 0.25,
-    fontFace: FB, fontSize: 8, color: B.mutedText,
-  });
 }
 
 // ---------- slide 2: Decision for Management ----------
@@ -469,18 +452,16 @@ function buildRevenueMarginDetail(
   ];
   tiles.forEach((t, i) => {
     const x = MARGIN_X + i * (tileW + 0.18);
-    const accent = i === 3 && finance.trailing_12m.net_income < 0 ? B.urgent
-                  : i === 2 && finance.trailing_12m.gross_margin_pct < 0.25 ? B.warn
+    const valueColor = i === 3 && finance.trailing_12m.net_income < 0 ? B.red
+                  : i === 2 && finance.trailing_12m.gross_margin_pct < 0.25 ? B.red
                   : B.navy;
     slide.addShape("rect", { x, y: kpiY, w: tileW, h: kpiH,
-      fill: { color: B.white }, line: { color: B.border, width: 0.5 } });
-    slide.addShape("rect", { x, y: kpiY, w: tileW, h: 0.06,
-      fill: { color: accent }, line: { color: accent, width: 0 } });
-    slide.addText(t.label, { x: x + 0.15, y: kpiY + 0.16, w: tileW - 0.3, h: 0.22,
-      fontFace: FB, fontSize: 9, bold: true, color: B.mutedText, charSpacing: 1.5 });
-    slide.addText(t.value, { x: x + 0.15, y: kpiY + 0.4, w: tileW - 0.3, h: 0.45,
-      fontFace: FT, fontSize: 22, bold: true, color: B.navy });
-    slide.addText(t.sub, { x: x + 0.15, y: kpiY + 0.78, w: tileW - 0.3, h: 0.25,
+      fill: { color: B.lightGray }, line: { color: B.border, width: 0.75 } });
+    slide.addText(t.label, { x: x + 0.18, y: kpiY + 0.16, w: tileW - 0.36, h: 0.22,
+      fontFace: FB, fontSize: 9, bold: true, color: B.bodyText, charSpacing: 1.5 });
+    slide.addText(t.value, { x: x + 0.18, y: kpiY + 0.4, w: tileW - 0.36, h: 0.45,
+      fontFace: FT, fontSize: 22, bold: true, color: valueColor });
+    slide.addText(t.sub, { x: x + 0.18, y: kpiY + 0.78, w: tileW - 0.36, h: 0.25,
       fontFace: FB, fontSize: 9, italic: true, color: B.mutedText });
   });
 

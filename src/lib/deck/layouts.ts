@@ -17,24 +17,26 @@ import type { DecisionTone } from "../board/decision-cards";
 
 // ---- Shared brand (subset; v1 has its own copy) ----
 
+// WorldClass board-template palette (matches board-template/TEMPLATE-SPEC.md).
+// Token names are unchanged so every existing reference re-skins automatically.
 export const DECK_BRAND = {
-  navy:     "003C71",
-  navyDeep: "002647",
-  red:      "E1261C",
-  ok:       "047857",
+  navy:     "0B1F3A",  // titles, dark panels, KPI values
+  navyDeep: "071326",  // cover background
+  red:      "B42318",  // accents, kickers, risk values
+  ok:       "027A48",
   warn:     "B45309",
-  urgent:   "B91C1C",
-  darkText: "1F2937",
-  bodyText: "374151",
-  mutedText:"6B7280",
-  lightGray:"F3F4F6",
-  border:   "D1D5DB",
-  banding:  "F9FAFB",
+  urgent:   "B42318",
+  darkText: "111827",
+  bodyText: "475467",
+  mutedText:"8A95A3",  // kickers, captions, footer
+  lightGray:"F2F4F7",  // KPI card fill
+  border:   "E4E7EC",  // hairlines
+  banding:  "FBFBFC",
   white:    "FFFFFF",
 } as const;
 
-export const DECK_FONT_TITLE = "Georgia";
-export const DECK_FONT_BODY = "Calibri";
+export const DECK_FONT_TITLE = "Aptos Display";
+export const DECK_FONT_BODY = "Aptos";
 
 // ---------------------------------------------------------------------------
 // addDecisionCard — anchored at the bottom of a slide
@@ -112,14 +114,6 @@ export type AddKpiTwoRowOpts = {
   rowLabels?: { volume: string; money: string };
 };
 
-const TONE_ACCENT: Record<NonNullable<KpiTile["tone"]>, string> = {
-  navy: DECK_BRAND.navy,
-  ok: DECK_BRAND.ok,
-  warn: DECK_BRAND.warn,
-  red: DECK_BRAND.urgent,
-  neutral: DECK_BRAND.mutedText,
-};
-
 export function addKpiTwoRow(slide: PptxGenJS.Slide, o: AddKpiTwoRowOpts): void {
   const y = o.y ?? 1.3;
   const h = o.h ?? 4.0;
@@ -160,30 +154,29 @@ function drawTileRow(
   const gap = 0.18;
   tiles.forEach((tile, i) => {
     const x = startX + i * (w + gap);
-    const accent = TONE_ACCENT[tile.tone ?? "navy"];
+    // Template cards have no top accent stripe; tone colors the value instead.
+    const tone = tile.tone ?? "navy";
+    const valueColor = (tone === "warn" || tone === "red")
+      ? DECK_BRAND.red
+      : DECK_BRAND.navy;
 
-    // Card
+    // Card — light fill + hairline border (template style)
     slide.addShape("rect", {
       x, y, w, h,
-      fill: { color: DECK_BRAND.white },
-      line: { color: DECK_BRAND.border, width: 0.5 },
-    });
-    // Top accent stripe
-    slide.addShape("rect", {
-      x, y, w, h: 0.06,
-      fill: { color: accent }, line: { color: accent, width: 0 },
+      fill: { color: DECK_BRAND.lightGray },
+      line: { color: DECK_BRAND.border, width: 0.75 },
     });
     // Label
     slide.addText(tile.label, {
-      x: x + 0.15, y: y + 0.18, w: w - 0.3, h: 0.25,
+      x: x + 0.18, y: y + 0.16, w: w - 0.36, h: 0.25,
       fontFace: DECK_FONT_BODY, fontSize: 9, bold: true,
-      color: DECK_BRAND.mutedText, charSpacing: 1.5,
+      color: DECK_BRAND.bodyText, charSpacing: 1.5,
     });
     // Value
     slide.addText(tile.value, {
-      x: x + 0.15, y: y + 0.46, w: w - 0.3, h: 0.85,
+      x: x + 0.18, y: y + 0.44, w: w - 0.36, h: 0.85,
       fontFace: DECK_FONT_TITLE, fontSize: 28, bold: true,
-      color: DECK_BRAND.navy, valign: "top",
+      color: valueColor, valign: "top",
     });
     // Sub
     if (tile.sub) {
