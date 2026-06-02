@@ -76,6 +76,32 @@ Use **slides 1–9** for the board packet. Keep **10–15** as presenter prep.
 
 ---
 
+## 4a. Operator narrative (standard monthly input)
+
+Every month the operations leader (GM/COO) supplies a five-section narrative that
+feeds the dashboard's "Operational narrative" and "Management attention" cards and
+the deck's operator slides. It is stored one-row-per-period in
+`u1d_ops.monthly_operator_notes`:
+
+| Column | Section | Goes to |
+|---|---|---|
+| `capacity_md` | Capacity & production | Operational narrative card / deck ops slide |
+| `supply_chain_md` | Supply chain | Operational narrative card |
+| `quality_md` | Quality & incidents | Operational narrative card |
+| `initiatives_md` | Initiatives | Management attention card |
+| `risks_md` | Risks (ALTO / MED) | Management attention card |
+
+Rules for this content:
+
+- **Plain text, not markdown.** The board page renders these with
+  `whitespace-pre-wrap`, so use real line breaks and `•` / `1.` glyphs — no
+  `**bold**` or `-` markdown syntax (it shows literally).
+- Independent of the data lock: operations sign off the narrative separately;
+  updating it does not require reopening the period.
+- Keep a version-controlled copy of each month's narrative under `db/data/`
+  (e.g. `db/data/2026-04_operator_notes.sql`) as the audit record.
+- Apply with `railway connect Postgres` → `\i db/data/{period}_operator_notes.sql`.
+
 ## 5. Hard guardrails (carry every month)
 - QuickBooks P&L is the authoritative revenue/margin source. The customer-file revenue
   view is **not** board-grade until it reconciles to the GL.
