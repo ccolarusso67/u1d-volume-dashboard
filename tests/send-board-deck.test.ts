@@ -150,6 +150,10 @@ function buildPool(opts: BuildOpts = {}): TestPool {
         if (!t.includes("COUNT(DISTINCT vf.customer_key)")) return null;
         return { rows: [{ total_gallons: 175319, customer_count: 5, package_count: 12, fact_row_count: 50 }] };
       },
+      // YTD months-in-year + 12-month trend (exec dashboard, v2 deck path).
+      // Empty rows are fine — the deck renders with no trend bars.
+      (t) => (t.includes("GROUP BY file.period_year, file.period_month") ? { rows: [] } : null),
+      (t) => (t.includes("period_pairs") ? { rows: [] } : null),
       // ----- distribution list responders -----
       (t) =>
         t.includes("FROM u1d_ops.board_distribution_lists\n      WHERE list_id")
@@ -212,7 +216,7 @@ test("sendBoardDeck: happy path → audit row + email sent with attachment", asy
   assert.equal(r.sent_to_count, 1);
   assert.equal(r.cc_count, 1);
   assert.equal(r.bcc_count, 1);
-  assert.equal(r.deck_filename, "U1D_Board_Report_2026_05.pptx");
+  assert.equal(r.deck_filename, "U1Dynamics_Board_Report_2026_05.pptx");
 
   // Provider received the right shape.
   assert.equal(provider.sent.length, 1);
@@ -220,7 +224,7 @@ test("sendBoardDeck: happy path → audit row + email sent with attachment", asy
   assert.deepEqual(provider.sent[0].cc, ["ops@x"]);
   assert.deepEqual(provider.sent[0].bcc, ["audit@x"]);
   assert.equal(provider.sent[0].attachments.length, 1);
-  assert.equal(provider.sent[0].attachments[0].filename, "U1D_Board_Report_2026_05.pptx");
+  assert.equal(provider.sent[0].attachments[0].filename, "U1Dynamics_Board_Report_2026_05.pptx");
   assert.ok(provider.sent[0].attachments[0].content.byteLength > 5000, "attachment is a real pptx");
 
   // Audit insert happened.

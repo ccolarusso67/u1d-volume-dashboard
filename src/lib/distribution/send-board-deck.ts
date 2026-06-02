@@ -23,7 +23,8 @@
  */
 import type { Pool } from "pg";
 import { getBoardPeriod } from "../board/get-board-period";
-import { generateMonthlyDeck, deckFilename } from "../deck/generate-monthly-deck";
+import { getBoardExecutiveDashboard } from "../board/get-board-executive-dashboard";
+import { generateMonthlyDeckV2, deckFilenameV2 } from "../deck/generate-monthly-deck-v2";
 import { getDistributionList } from "./get-distribution-list";
 import { renderBoardDeckEmail } from "./render-board-deck-email";
 import { recordBoardDeckSend } from "./record-board-deck-send";
@@ -162,11 +163,16 @@ export async function sendBoardDeck(
     }
   }
 
-  // ---- 5. Generate the deck. From here on, failures are audited. ----
-  const filename = deckFilename(board);
+  // ---- 5. Generate the deck (v2). From here on, failures are audited. ----
+  // Load the full executive dashboard (incl. finance overlay) that the v2
+  // generator needs. Same period the readiness gate above already passed, so
+  // generateMonthlyDeckV2's own locked/ready guard will pass too. This keeps
+  // the emailed deck identical to the one the /api/admin/deck download serves.
+  const view = await getBoardExecutiveDashboard(deps.pool, input.year, input.month);
+  const filename = deckFilenameV2(view);
   let buffer: Buffer;
   try {
-    buffer = await generateMonthlyDeck(board);
+    buffer = await generateMonthlyDeckV2(view);
   } catch (err) {
     // The generator itself has a readiness gate that we already passed,
     // so this is a real generator failure. Audit + rethrow.
