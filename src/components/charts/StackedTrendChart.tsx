@@ -11,11 +11,11 @@ import {
 // Shared category palette (redesign system). Reused by the overview donut so
 // the stacked-trend chart and the mix donut color categories identically.
 export const CATEGORY_COLORS: Record<string, string> = {
-  "Oil":      "#15385D",
-  "Coolant":  "#1C6FB8",
-  "DEF":      "#ED8B00",
-  "WW":       "#5DCAA5",
-  "Other":    "#8A95A3",
+  "Oil":      "#EAB308",  // yellow
+  "Coolant":  "#ED8B00",  // orange
+  "DEF":      "#1C6FB8",  // blue
+  "WW":       "#5DCAA5",  // teal
+  "Other":    "#8A95A3",  // slate
 };
 
 export type StackedTrendRow = {
