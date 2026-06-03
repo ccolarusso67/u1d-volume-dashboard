@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --navy: #0b1f3a;
-  --navy-deep: #071326;
+  --navy: #15385d;
+  --navy-deep: #0d2440;
   --brand-red: #e1261c;
   --brand-orange: #ed8b00;
   --brand-green: #067a46;

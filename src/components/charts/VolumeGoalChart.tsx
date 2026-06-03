@@ -39,7 +39,7 @@ export function VolumeGoalChart({ data }: { data: VolumeGoalPoint[] }) {
             formatter={(value, name) => [fmt(Number(value)) + " gal", name === "billed" ? "Billed" : "Goal"]}
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E6E9EE" }}
           />
-          <Bar dataKey="billed" name="billed" fill="#0B1F3A" radius={[3, 3, 0, 0]} barSize={22} />
+          <Bar dataKey="billed" name="billed" fill="#15385D" radius={[3, 3, 0, 0]} barSize={22} />
           <Line
             dataKey="goal"
             name="goal"
