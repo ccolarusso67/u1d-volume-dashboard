@@ -144,6 +144,19 @@ export default async function DashboardPage(props: {
   const topConcentration = windowAgg.byCustomer.slice(0, 5);
   const concMax = topConcentration.length ? topConcentration[0].gallons : 1;
 
+  // Point-in-time comparison — current month vs 3M / 6M / 1Y ago (billed).
+  const billedByOrd = new Map<number, number>();
+  for (const r of reconRows) {
+    if (r.billed_gallons != null) billedByOrd.set(r.period_year * 12 + r.period_month, r.billed_gallons);
+  }
+  const curOrd = latest.period_year * 12 + latest.period_month;
+  const curVol = billedByOrd.get(curOrd) ?? latest.total_gallons;
+  const comparePoints = [
+    { label: "vs 3 months ago", ref: billedByOrd.get(curOrd - 3) ?? null },
+    { label: "vs 6 months ago", ref: billedByOrd.get(curOrd - 6) ?? null },
+    { label: "vs year ago", ref: billedByOrd.get(curOrd - 12) ?? null },
+  ];
+
   // Driver chart wants biggest at top => largest delta first
   const driverData = positiveDrivers.map(d => ({
     package: d.display_name,
@@ -272,6 +285,29 @@ export default async function DashboardPage(props: {
             })}
           </section>
         </div>
+
+        {/* Point-in-time comparison */}
+        <section className="bg-white border border-line rounded-xl p-6 mb-6">
+          <h2 className="font-heading text-xl font-bold text-navy">Volume — comparison</h2>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1 mb-4">
+            {formatPeriod(latest.period_year, latest.period_month)} vs prior points · billed gallons
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPITile label="This month" value={fmtNum(curVol)} subtitle="billed gallons" accent="navy" />
+            {comparePoints.map((p) => {
+              const change = p.ref && p.ref > 0 ? (curVol - p.ref) / p.ref : null;
+              return (
+                <KPITile
+                  key={p.label}
+                  label={p.label}
+                  value={change !== null ? `${change >= 0 ? "+" : ""}${fmtPct(change)}` : "—"}
+                  subtitle={p.ref != null ? `${fmtNum(p.ref)} → ${fmtNum(curVol)}` : "no data for that period"}
+                  accent={change === null ? "neutral" : change >= 0 ? "success" : "red"}
+                />
+              );
+            })}
+          </div>
+        </section>
 
         {/* 6-Month Stacked Trend Chart */}
         <section className="bg-white border border-line rounded-xl p-6 mb-6">
