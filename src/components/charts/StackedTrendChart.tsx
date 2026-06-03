@@ -10,13 +10,12 @@ import {
 // category that mirrors the packages.family enum.
 // Shared category palette (redesign system). Reused by the overview donut so
 // the stacked-trend chart and the mix donut color categories identically.
-// Conventional fluid colors so the mix reads at a glance.
 export const CATEGORY_COLORS: Record<string, string> = {
-  "Oil":      "#E0A100",  // amber/gold — motor oil
-  "Coolant":  "#2E9E5B",  // green — antifreeze
-  "WW":       "#1C6FB8",  // blue — windshield washer
-  "DEF":      "#17B0A0",  // teal — DEF (AdBlue-adjacent, distinct from WW blue)
-  "Other":    "#8A95A3",  // slate
+  "Oil":      "#15385D",  // dark blue
+  "Coolant":  "#ED8B00",  // orange
+  "WW":       "#1C6FB8",  // blue
+  "DEF":      "#8A95A3",  // grey
+  "Other":    "#C7CFD9",  // light grey
 };
 
 export type StackedTrendRow = {

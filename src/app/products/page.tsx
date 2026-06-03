@@ -47,7 +47,7 @@ export default async function ProductsPage() {
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value);
   const donutColors = donutData.map(
-    (d, i) => CATEGORY_COLORS[d.name] ?? ["#E0A100", "#2E9E5B", "#1C6FB8", "#17B0A0", "#8A95A3"][i % 5]
+    (d, i) => CATEGORY_COLORS[d.name] ?? ["#15385D", "#ED8B00", "#1C6FB8", "#8A95A3", "#C7CFD9"][i % 5]
   );
 
   const topPkg = packages[0];

@@ -119,7 +119,7 @@ export default async function DashboardPage() {
     : [];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
   const donutColors = donutData.map(
-    (d, i) => CATEGORY_COLORS[d.name] ?? ["#E0A100", "#2E9E5B", "#1C6FB8", "#17B0A0", "#8A95A3"][i % 5]
+    (d, i) => CATEGORY_COLORS[d.name] ?? ["#15385D", "#ED8B00", "#1C6FB8", "#8A95A3", "#C7CFD9"][i % 5]
   );
   const topConcentration = customers.slice().sort((a, b) => b.current_gallons - a.current_gallons).slice(0, 5);
   const concMax = topConcentration.length ? topConcentration[0].current_gallons : 1;
