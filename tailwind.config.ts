@@ -11,7 +11,7 @@ const config: Config = {
       colors: {
         navy: {
           DEFAULT: "#15385D",
-          deep: "#0D2440",
+          deep: "#102E4D",
         },
         brand: {
           red: "#E1261C",

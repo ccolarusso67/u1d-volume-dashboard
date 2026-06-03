@@ -39,11 +39,7 @@ export function Nav({ current }: { current: string }) {
       className="bg-navy-deep border-b border-white/10"
       aria-label="Primary"
     >
-      <div className="container mx-auto px-4 sm:px-8 max-w-7xl flex items-center gap-5">
-        <Link href="/" className="shrink-0 flex items-center py-2" aria-label="U1Dynamics home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/u1d-logo-white.png" alt="U1Dynamics" className="h-7 w-auto" />
-        </Link>
+      <div className="container mx-auto px-4 sm:px-8 max-w-7xl">
         {/* Horizontal scroll on narrow screens; flex row on desktop. */}
         <ul
           className="flex gap-1 overflow-x-auto no-scrollbar"

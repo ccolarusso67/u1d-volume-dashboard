@@ -16,7 +16,6 @@
  *   - Logo on the left (inline SVG by default, override available)
  *   - Type ramp consistent with the deck cover (Georgia for titles)
  */
-import { U1DLogo } from "./u1d-logo";
 
 type Props = {
   eyebrow?: string;
@@ -52,9 +51,12 @@ export function HeroHeader({
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="flex items-start gap-5 flex-1 min-w-0">
             {showLogo && (
-              <div className="flex-shrink-0 hidden sm:block bg-white rounded-md px-3 py-2 shadow-sm">
-                <U1DLogo size={40} useRaster />
-              </div>
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src="/u1d-logo-white.png"
+                alt="U1Dynamics"
+                className="flex-shrink-0 hidden sm:block h-12 w-auto"
+              />
             )}
             <div className="min-w-0">
               {eyebrow && (
@@ -81,7 +83,7 @@ export function HeroHeader({
         {actions && <div className="mt-5">{actions}</div>}
       </div>
       {/* Red accent stripe — single source of "U1D brand" cue */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#E1261C]" />
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#E1261C]" />
     </header>
   );
 }
