@@ -78,6 +78,16 @@ export function buildDeckTokens(view: BoardExecutiveDashboard): Record<string, s
       : NA,
   };
 
+  // Slide 6 — top-5 accounts (name + share)
+  const tc = view.topCustomers ?? [];
+  for (let i = 0; i < 5; i++) {
+    const c = tc[i];
+    t[`ACCT${i + 1}_NAME`] = c
+      ? c.customer_name + (c.is_intercompany ? " · intercompany" : "")
+      : NA;
+    t[`ACCT${i + 1}_SHARE`] = c && c.share_pct !== null ? pctOf(c.share_pct) : NA;
+  }
+
   if (f) {
     const tm = f.trailing_12m;
     const wc = f.working_capital;
