@@ -8,12 +8,14 @@ import {
 // Category palette. Single source of truth for the stacked-bar chart
 // after PR 002 collapsed the Heavy/Light oil split into a single "Oil"
 // category that mirrors the packages.family enum.
-const CATEGORY_COLORS: Record<string, string> = {
-  "Oil":      "#003C71",
-  "Coolant":  "#E1261C",
-  "WW":       "#F59E0B",
-  "DEF":      "#6B7280",
-  "Other":    "#9CA3AF",
+// Shared category palette (redesign system). Reused by the overview donut so
+// the stacked-trend chart and the mix donut color categories identically.
+export const CATEGORY_COLORS: Record<string, string> = {
+  "Oil":      "#15385D",
+  "Coolant":  "#1C6FB8",
+  "DEF":      "#ED8B00",
+  "WW":       "#5DCAA5",
+  "Other":    "#8A95A3",
 };
 
 export type StackedTrendRow = {

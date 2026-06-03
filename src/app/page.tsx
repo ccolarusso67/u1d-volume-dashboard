@@ -12,10 +12,10 @@ import { getVolumeGoal } from "@/lib/queries/volume-goal";
 import { getReconciliation } from "@/lib/queries/production";
 import { getDailyTargetGallons } from "@/lib/settings/app-settings";
 import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
-import { MixDonut, MIX_COLORS } from "@/components/charts/MixDonut";
+import { MixDonut } from "@/components/charts/MixDonut";
 
 const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
+import { StackedTrendChart, StackedTrendRow, CATEGORY_COLORS } from "@/components/charts/StackedTrendChart";
 import { CATEGORY_DISPLAY_ORDER } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
 import { PackageMixChart } from "@/components/charts/PackageMixChart";
@@ -118,6 +118,7 @@ export default async function DashboardPage() {
     ? CATEGORIES.map((c) => ({ name: c, value: Number(latestCatRow[c] ?? 0) })).filter((d) => d.value > 0)
     : [];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
+  const donutColors = donutData.map((d) => CATEGORY_COLORS[d.name] ?? "#8A95A3");
   const topConcentration = customers.slice().sort((a, b) => b.current_gallons - a.current_gallons).slice(0, 5);
   const concMax = topConcentration.length ? topConcentration[0].current_gallons : 1;
 
@@ -208,12 +209,12 @@ export default async function DashboardPage() {
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-2">
                   {donutData.map((d, i) => (
                     <span key={d.name} className="flex items-center gap-1.5">
-                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: MIX_COLORS[i % MIX_COLORS.length] }} />
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: donutColors[i] }} />
                       {d.name} {fmtPct(d.value / donutTotal, 1, false)}
                     </span>
                   ))}
                 </div>
-                <MixDonut data={donutData} />
+                <MixDonut data={donutData} colors={donutColors} />
               </>
             ) : (
               <div className="text-sm italic text-gray-400 py-8 text-center">No category data.</div>

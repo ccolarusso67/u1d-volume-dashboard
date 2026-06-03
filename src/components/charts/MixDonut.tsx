@@ -10,8 +10,9 @@ export const MIX_COLORS = ["#15385D", "#1C6FB8", "#ED8B00", "#5DCAA5", "#9FE1CB"
 
 export type MixSlice = { name: string; value: number };
 
-export function MixDonut({ data }: { data: MixSlice[] }) {
+export function MixDonut({ data, colors }: { data: MixSlice[]; colors?: string[] }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const colorAt = (i: number) => colors?.[i] ?? MIX_COLORS[i % MIX_COLORS.length];
   return (
     <div style={{ width: "100%", height: 230 }}>
       <ResponsiveContainer>
@@ -28,7 +29,7 @@ export function MixDonut({ data }: { data: MixSlice[] }) {
             isAnimationActive={false}
           >
             {data.map((_, i) => (
-              <Cell key={i} fill={MIX_COLORS[i % MIX_COLORS.length]} />
+              <Cell key={i} fill={colorAt(i)} />
             ))}
           </Pie>
           <Tooltip
