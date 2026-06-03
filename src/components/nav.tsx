@@ -1,20 +1,24 @@
 import Link from "next/link";
+import { getLocale } from "@/lib/i18n/locale";
+import { getDict } from "@/lib/i18n/dictionaries";
+import { LocaleToggle } from "@/components/locale-toggle";
 
 type NavItem = {
   href: string;
-  label: string;
+  /** Key into dict.nav for the visible label. */
+  labelKey: keyof ReturnType<typeof getDict>["nav"];
   /** Active when the current path equals href OR starts with any of these prefixes. */
   matchPrefixes: string[];
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/",                label: "Overview",       matchPrefixes: ["/"] },
-  { href: "/customers",       label: "Customers",      matchPrefixes: ["/customers"] },
-  { href: "/products",        label: "Products",       matchPrefixes: ["/products"] },
-  { href: "/production",      label: "Production",     matchPrefixes: ["/production"] },
-  { href: "/reconciliation",  label: "Reconciliation", matchPrefixes: ["/reconciliation"] },
-  { href: "/board",           label: "Board",          matchPrefixes: ["/board"] },
-  { href: "/admin",           label: "Admin",          matchPrefixes: ["/admin"] },
+  { href: "/",                labelKey: "overview",       matchPrefixes: ["/"] },
+  { href: "/customers",       labelKey: "customers",      matchPrefixes: ["/customers"] },
+  { href: "/products",        labelKey: "products",       matchPrefixes: ["/products"] },
+  { href: "/production",      labelKey: "production",     matchPrefixes: ["/production"] },
+  { href: "/reconciliation",  labelKey: "reconciliation", matchPrefixes: ["/reconciliation"] },
+  { href: "/board",           labelKey: "board",          matchPrefixes: ["/board"] },
+  { href: "/admin",           labelKey: "admin",          matchPrefixes: ["/admin"] },
 ];
 
 /**
@@ -35,13 +39,15 @@ function isActive(current: string, item: NavItem): boolean {
   return false;
 }
 
-export function Nav({ current }: { current: string }) {
+export async function Nav({ current }: { current: string }) {
+  const locale = await getLocale();
+  const d = getDict(locale);
   return (
     <nav
       className="bg-navy-deep border-b border-white/10"
       aria-label="Primary"
     >
-      <div className="container mx-auto px-4 sm:px-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-8 max-w-7xl flex items-center justify-between gap-4">
         {/* Horizontal scroll on narrow screens; flex row on desktop. */}
         <ul
           className="flex gap-1 overflow-x-auto no-scrollbar"
@@ -66,12 +72,15 @@ export function Nav({ current }: { current: string }) {
                       : "text-white/70 hover:text-white border-transparent hover:bg-white/[0.04]",
                   ].join(" ")}
                 >
-                  {item.label}
+                  {d.nav[item.labelKey]}
                 </Link>
               </li>
             );
           })}
         </ul>
+        <div className="shrink-0">
+          <LocaleToggle locale={locale} />
+        </div>
       </div>
     </nav>
   );
