@@ -251,3 +251,58 @@ export async function getMonthlyCategoryTrend(n: number): Promise<CategoryTrendR
     [n]
   );
 }
+
+// ---------------------------------------------------------------------------
+// Trailing-window aggregates — sum by customer and package over the latest N
+// months (Month/3M/4M/6M/YoY). Reuses the "latest N months" pattern above.
+// ---------------------------------------------------------------------------
+export type WindowCustomerRow = {
+  customer_key: string;
+  display_name: string;
+  is_intercompany: boolean;
+  gallons: number;
+};
+export type WindowPackageRow = {
+  package_key: string;
+  display_name: string;
+  family: string;
+  gallons: number;
+};
+export type WindowAggregates = {
+  total_gallons: number;
+  byCustomer: WindowCustomerRow[];
+  byPackage: WindowPackageRow[];
+};
+
+const LATEST_N_MONTHS = `(
+  SELECT period_year, period_month FROM u1d_ops.mv_monthly_totals
+  ORDER BY period_year DESC, period_month DESC LIMIT $1
+)`;
+
+export async function getWindowAggregates(months: number): Promise<WindowAggregates> {
+  const n = Math.max(1, Math.floor(months));
+  const [byCustomer, byPackage] = await Promise.all([
+    query<WindowCustomerRow>(
+      `SELECT c.customer_key, c.display_name, c.is_intercompany,
+              SUM(v.gallons)::float8 AS gallons
+         FROM ${ACTIVE_VOLUME_FACT} v
+         JOIN u1d_ops.customers c USING (customer_key)
+        WHERE (v.period_year, v.period_month) IN ${LATEST_N_MONTHS}
+        GROUP BY c.customer_key, c.display_name, c.is_intercompany
+        ORDER BY gallons DESC`,
+      [n]
+    ),
+    query<WindowPackageRow>(
+      `SELECT p.package_key, p.display_name, p.family,
+              SUM(v.gallons)::float8 AS gallons
+         FROM ${ACTIVE_VOLUME_FACT} v
+         JOIN u1d_ops.packages p USING (package_key)
+        WHERE (v.period_year, v.period_month) IN ${LATEST_N_MONTHS}
+        GROUP BY p.package_key, p.display_name, p.family
+        ORDER BY gallons DESC`,
+      [n]
+    ),
+  ]);
+  const total_gallons = byPackage.reduce((s, r) => s + (r.gallons ?? 0), 0);
+  return { total_gallons, byCustomer, byPackage };
+}

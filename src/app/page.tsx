@@ -5,7 +5,7 @@ import {
   getLatestMonth, getMonth, getRecentMonths,
   getCustomerYoYForMonth, getPackageMixForMonth,
   getPackageYoYForMonth, getYTDComparison,
-  getMonthlyCategoryTrend,
+  getMonthlyCategoryTrend, getWindowAggregates,
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
 import { getReconciliation } from "@/lib/queries/production";
@@ -16,7 +16,7 @@ import { RangeSelector, rangeMonths, rangeLabel, normalizeRange } from "@/compon
 
 const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import { StackedTrendChart, StackedTrendRow, CATEGORY_COLORS } from "@/components/charts/StackedTrendChart";
-import { CATEGORY_DISPLAY_ORDER } from "@/lib/queries/category";
+import { CATEGORY_DISPLAY_ORDER, categorizeFamily } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
 import { PackageMixChart } from "@/components/charts/PackageMixChart";
 
@@ -96,6 +96,7 @@ export default async function DashboardPage(props: {
   const windowDelta = windowVol - windowGoal;
   const windowMet = windowVol >= windowGoal;
   const windowSuffix = months === 1 ? "" : ` · ${rangeLabel(range)}`;
+  const windowAgg = await getWindowAggregates(months);
 
   const momPct = prevMonthData
     ? (latest.total_gallons - prevMonthData.total_gallons) / prevMonthData.total_gallons
@@ -126,17 +127,22 @@ export default async function DashboardPage(props: {
     return row;
   });
 
-  // Product-mix donut (latest period category share) + customer concentration.
-  const latestCatRow = stackedData[stackedData.length - 1];
-  const donutData = latestCatRow
-    ? CATEGORIES.map((c) => ({ name: c, value: Number(latestCatRow[c] ?? 0) })).filter((d) => d.value > 0)
-    : [];
-  const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
+  // Product-mix donut + customer concentration over the selected window.
+  const catAgg = new Map<string, number>();
+  for (const p of windowAgg.byPackage) {
+    const cat = categorizeFamily(p.family);
+    catAgg.set(cat, (catAgg.get(cat) ?? 0) + p.gallons);
+  }
+  const donutData = Array.from(catAgg.entries())
+    .map(([name, value]) => ({ name, value }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const donutTotal = windowAgg.total_gallons || 1;
   const donutColors = donutData.map(
     (d, i) => CATEGORY_COLORS[d.name] ?? ["#15385D", "#ED8B00", "#1C6FB8", "#8A95A3", "#C7CFD9"][i % 5]
   );
-  const topConcentration = customers.slice().sort((a, b) => b.current_gallons - a.current_gallons).slice(0, 5);
-  const concMax = topConcentration.length ? topConcentration[0].current_gallons : 1;
+  const topConcentration = windowAgg.byCustomer.slice(0, 5);
+  const concMax = topConcentration.length ? topConcentration[0].gallons : 1;
 
   // Driver chart wants biggest at top => largest delta first
   const driverData = positiveDrivers.map(d => ({
@@ -224,7 +230,7 @@ export default async function DashboardPage(props: {
           <section className="bg-white border border-line rounded-xl p-6">
             <h2 className="font-heading text-xl font-bold text-navy">Product mix</h2>
             <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1 mb-3">
-              {formatPeriod(latest.period_year, latest.period_month)} · share of gallons
+              {months === 1 ? formatPeriod(latest.period_year, latest.period_month) : rangeLabel(range)} · share of gallons
             </div>
             {donutData.length > 0 ? (
               <>
@@ -246,11 +252,11 @@ export default async function DashboardPage(props: {
           <section className="bg-white border border-line rounded-xl p-6">
             <h2 className="font-heading text-xl font-bold text-navy">Customer concentration</h2>
             <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1 mb-4">
-              {formatPeriod(latest.period_year, latest.period_month)} · top accounts by gallons
+              {months === 1 ? formatPeriod(latest.period_year, latest.period_month) : rangeLabel(range)} · top accounts by gallons
             </div>
             {topConcentration.map((c) => {
-              const share = latest.total_gallons > 0 ? c.current_gallons / latest.total_gallons : 0;
-              const w = concMax > 0 ? (c.current_gallons / concMax) * 100 : 0;
+              const share = donutTotal > 0 ? c.gallons / donutTotal : 0;
+              const w = concMax > 0 ? (c.gallons / concMax) * 100 : 0;
               return (
                 <div key={c.customer_key} className="flex items-center gap-3 my-2.5 text-sm">
                   <div className="w-40 truncate text-navy">
