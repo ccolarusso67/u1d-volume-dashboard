@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>U1Dynamics — Dashboard redesign preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --navy:#0B1F3A; --navy-deep:#071326; --ink:#10202F; --slate:#5B6776;
+    --muted:#8A95A3; --line:#E6E9EE; --paper:#F6F8FB; --card:#FFFFFF;
+    --red:#B42318; --green:#067A46; --accent:#1C6FB8; --orange:#ED8B00;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+  .kicker{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+
+  /* top bar */
+  .topbar{background:var(--navy-deep);color:#fff;display:flex;align-items:center;
+    gap:28px;padding:0 32px;height:60px}
+  .logo{display:flex;align-items:baseline;gap:8px;font-weight:800;letter-spacing:.06em}
+  .logo .star{color:#E1261C}
+  .nav{display:flex;gap:26px;font-size:13px}
+  .nav a{color:#AEBAC9;text-decoration:none;padding:6px 0;border-bottom:2px solid transparent}
+  .nav a.active{color:#fff;border-bottom-color:#E1261C}
+  .nav a:hover{color:#fff}
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:18px;font-size:12px;color:#AEBAC9}
+  .pill{border:1px solid #2A3C55;border-radius:6px;padding:6px 12px;color:#fff;display:flex;gap:8px;align-items:center}
+  .avatar{width:30px;height:30px;border-radius:50%;background:#1C6FB8;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 32px 56px}
+
+  /* page head */
+  .head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px}
+  .head h1{font-size:30px;font-weight:600;color:var(--navy);letter-spacing:-.01em}
+  .head .sub{color:var(--slate);font-size:13px;margin-top:4px}
+  .rule{height:1px;background:var(--line);margin:16px 0 24px}
+  .btn{background:var(--navy);color:#fff;border:none;border-radius:7px;padding:10px 16px;
+    font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:26px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;position:relative}
+  .kpi .lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:10px}
+  .kpi .val{font-size:26px;font-weight:700;color:var(--navy);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .val.neg{color:var(--red)}
+  .kpi .val.pos{color:var(--green)}
+  .kpi .meta{font-size:11.5px;color:var(--muted);margin-top:9px}
+  .kpi .spark{position:absolute;right:14px;top:14px;width:54px;height:22px}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+  .tag.red{background:#FBEAE8;color:var(--red)} .tag.green{background:#E5F3EC;color:var(--green)}
+
+  /* panels */
+  .grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-bottom:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .panel h3{font-size:15px;font-weight:600;color:var(--navy)}
+  .panel .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--slate);margin-bottom:10px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .chartbox{position:relative;width:100%}
+
+  /* concentration bars */
+  .crow{display:flex;align-items:center;gap:10px;margin:11px 0;font-size:13px}
+  .crow .nm{width:150px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .track{flex:1;height:9px;background:#EEF1F5;border-radius:6px;overflow:hidden}
+  .crow .fill{height:100%;background:var(--navy);border-radius:6px}
+  .crow .fill.inter{background:var(--accent)}
+  .crow .pc{width:46px;text-align:right;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700}
+  th.l,td.l{text-align:left}
+  td{padding:11px 10px;border-bottom:1px solid #F0F2F6;text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  .neg{color:var(--red)} .pos{color:var(--green)}
+  .foot{margin-top:30px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="../public/u1d-logo-white.png" alt="U1Dynamics" style="height:34px;width:auto;display:block" />
+    <nav class="nav">
+      <a class="active" href="#">Overview</a>
+      <a href="#">Production</a>
+      <a href="#">Reconciliation</a>
+      <a href="#">Board</a>
+      <a href="#">Admin</a>
+    </nav>
+    <div class="right">
+      <span class="pill"><i>▦</i> April 2026 ▾</span>
+      <span>Data fresh · Jun 2</span>
+      <span class="avatar">TC</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <div class="kicker">U1Dynamics Manufacturing LLC · Monthly operating view</div>
+        <h1 class="serif">Volume Dashboard</h1>
+        <div class="sub">April 2026 &nbsp;·&nbsp; Locked Jun 2, 2026 &nbsp;·&nbsp; 4 customers · 12 packages</div>
+      </div>
+      <button class="btn">Generate board deck (.pptx)</button>
+    </div>
+    <div class="rule"></div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="lab">Month volume</div>
+        <div class="val">103,453</div>
+        <div class="meta">gallons billed</div>
+      </div>
+      <div class="kpi" style="box-shadow:inset 0 3px 0 var(--orange)">
+        <div class="lab">Volume goal</div>
+        <div class="val">154,000</div>
+        <div class="meta">22 days × 7,000 gal</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Goal delta</div>
+        <div class="val neg">−50,547</div>
+        <div class="meta"><span class="tag red">−32.8% below</span></div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Month over month</div>
+        <div class="val neg">−41.0%</div>
+        <div class="meta">−71,866 vs Mar</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Year over year</div>
+        <div class="val neg">−1.1%</div>
+        <div class="meta">−1,147 vs Apr 2025</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">YTD volume</div>
+        <div class="val">531,759</div>
+        <div class="meta"><span class="tag green">+22.4% vs PY</span></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <div class="ph">
+          <div><h3>Volume vs goal</h3><div class="kicker" style="margin-top:4px">Last 12 months · billed gallons</div></div>
+        </div>
+        <div class="legend">
+          <span><span class="dot" style="background:#0B1F3A"></span>Billed volume</span>
+          <span><span class="dot" style="background:#ED8B00"></span>Monthly goal (working days × 7,000)</span>
+        </div>
+        <div class="chartbox" style="height:300px"><canvas id="volChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><div><h3>Product mix</h3><div class="kicker" style="margin-top:4px">Q1 2026 · share of gallons</div></div></div>
+        <div class="legend">
+          <span><span class="dot" style="background:#0B1F3A"></span>Oil 63.3%</span>
+          <span><span class="dot" style="background:#1C6FB8"></span>Coolant 30.3%</span>
+          <span><span class="dot" style="background:#ED8B00"></span>DEF 4.4%</span>
+          <span><span class="dot" style="background:#9FE1CB"></span>WW 2.1%</span>
+        </div>
+        <div class="chartbox" style="height:230px"><canvas id="mixChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <div class="ph"><div><h3>Customer concentration</h3><div class="kicker" style="margin-top:4px">April · top accounts by gallons</div></div>
+          <span class="tag red">Top-5 = 79%</span></div>
+        <div class="crow"><div class="nm">U1Dynamics Mfg <span style="color:var(--accent);font-size:11px">· intercompany</span></div><div class="track"><div class="fill inter" style="width:100%"></div></div><div class="pc">42.2%</div></div>
+        <div class="crow"><div class="nm">8A Dominus Inc.</div><div class="track"><div class="fill" style="width:31%"></div></div><div class="pc">13.2%</div></div>
+        <div class="crow"><div class="nm">Competitive Edge Dist.</div><div class="track"><div class="fill" style="width:23%"></div></div><div class="pc">9.7%</div></div>
+        <div class="crow"><div class="nm">Maxilub LLC</div><div class="track"><div class="fill" style="width:18%"></div></div><div class="pc">7.7%</div></div>
+        <div class="crow"><div class="nm">Amazon</div><div class="track"><div class="fill" style="width:16%"></div></div><div class="pc">6.6%</div></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><div><h3>Production vs billing</h3><div class="kicker" style="margin-top:4px">Recent months · gallons</div></div></div>
+        <table>
+          <thead><tr><th class="l">Period</th><th>Produced</th><th>Billed</th><th>Δ Inv.</th></tr></thead>
+          <tbody>
+            <tr><td class="l">Apr 2026</td><td>134,620</td><td>103,453</td><td class="pos">+31,167</td></tr>
+            <tr><td class="l">Mar 2026</td><td>141,451</td><td>175,319</td><td class="neg">−33,868</td></tr>
+            <tr><td class="l">Feb 2026</td><td>107,383</td><td>132,244</td><td class="neg">−24,861</td></tr>
+            <tr><td class="l">Jan 2026</td><td>125,976</td><td>120,743</td><td class="pos">+5,234</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot">Design preview · U1Dynamics dashboard redesign · light executive system</div>
+  </div>
+
+<script>
+const navy="#0B1F3A", red="#B42318";
+const months=["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
+const billed=[91063,104552,106311,124295,138084,162117,128804,122389,120743,132244,175319,103453];
+const wd=[21,21,22,21,21,23,18,21,20,20,22,22];
+const goal=wd.map(d=>d*7000);
+new Chart(document.getElementById('volChart'),{
+  data:{labels:months,datasets:[
+    {type:'bar',label:'Billed',data:billed,backgroundColor:navy,borderRadius:3,barPercentage:.66,order:2},
+    {type:'line',label:'Goal',data:goal,borderColor:"#ED8B00",borderWidth:2.5,borderDash:[5,4],pointRadius:0,tension:0,order:1}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      y:{grid:{color:'#EEF1F5'},ticks:{color:'#8A95A3',font:{size:11},callback:v=>(v/1000)+'k'}},
+      x:{grid:{display:false},ticks:{color:'#8A95A3',font:{size:11}}}
+    }}
+});
+new Chart(document.getElementById('mixChart'),{
+  type:'doughnut',
+  data:{labels:['Oil','Coolant','DEF','WW'],datasets:[{data:[63.3,30.3,4.4,2.1],
+    backgroundColor:['#0B1F3A','#1C6FB8','#ED8B00','#9FE1CB'],borderWidth:2,borderColor:'#fff'}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false}}}
+});
+</script>
+</body>
+</html>

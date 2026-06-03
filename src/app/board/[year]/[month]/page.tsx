@@ -245,6 +245,18 @@ export default async function BoardDashboardPage({
   const winDelta = winVol - winGoal;
   const winMet = winVol >= winGoal;
   const winSuffix = boardMonths === 1 ? "" : ` · ${rangeLabel(boardRange)}`;
+
+  // Point-in-time comparison vs 3M / 6M / 1Y before this board period (billed).
+  const bBilledByOrd = new Map<number, number>();
+  for (const r of reconRows) {
+    if (r.billed_gallons != null) bBilledByOrd.set(r.period_year * 12 + r.period_month, r.billed_gallons);
+  }
+  const bCur = bBilledByOrd.get(boardOrd) ?? h.total_gallons;
+  const bCompare = [
+    { label: "vs 3 months ago", ref: bBilledByOrd.get(boardOrd - 3) ?? null },
+    { label: "vs 6 months ago", ref: bBilledByOrd.get(boardOrd - 6) ?? null },
+    { label: "vs year ago", ref: bBilledByOrd.get(boardOrd - 12) ?? null },
+  ];
   const boardVolGoalSeries = view.trend12.map((t) => {
     const wd = wdByPeriod.get(`${t.period_year}-${t.period_month}`);
     return {
@@ -439,6 +451,28 @@ export default async function BoardDashboardPage({
         </div>
         <VolumeGoalChart data={boardVolGoalSeries} />
         <DecisionCard card={decisionVolume} />
+      </SectionCard>
+
+      {/* Volume — point-in-time comparison vs 3M / 6M / 1Y ago (billed gallons) */}
+      <SectionCard
+        title="Volume — comparison"
+        subtitle="This period's billed gallons against the same metric 3 months, 6 months, and one year earlier."
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard label="This period" value={fmtNum(bCur)} sub={view.period.label} tone="navy" />
+          {bCompare.map((c) => {
+            const pct = c.ref != null && c.ref !== 0 ? (bCur - c.ref) / c.ref : null;
+            return (
+              <KpiCard
+                key={c.label}
+                label={c.label}
+                value={pct == null ? "—" : `${pct >= 0 ? "+" : ""}${fmtPct(pct)}`}
+                sub={c.ref == null ? "no prior period" : `${fmtNum(c.ref)} gal`}
+                tone={pct == null ? "neutral" : pct >= 0 ? "ok" : "warn"}
+              />
+            );
+          })}
+        </div>
       </SectionCard>
 
       {/* 3. Financial performance — canonical QuickBooks P&L (u1p_finance, direct DB) */}

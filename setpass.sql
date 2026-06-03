@@ -1,0 +1,1 @@
+UPDATE u1d_ops.users SET password_hash = 'scrypt$7093b1cd2e5c8a67540e07d5e022afa6$9ca51a5cdde9cca7b280d08dc1ec9a3ef07a15ed8e86f639d001691a5d9532f8467b94e810c756c28dbb310d4495dd22ee9ecf359b47bfbcd29a12e3cec64b15' WHERE LOWER(email) = LOWER('ccolarusso@ultra1plus.com');
