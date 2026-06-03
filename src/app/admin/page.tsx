@@ -94,6 +94,17 @@ export default async function AdminHome() {
                 Manage board deck distribution lists and recipients.
               </div>
             </a>
+            {isAdmin && (
+              <a
+                href="/admin/users"
+                className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
+              >
+                <div className="text-sm font-medium">Users &amp; Access →</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  Add members, set roles, and manage passwords.
+                </div>
+              </a>
+            )}
           </div>
           <p className="text-xs text-gray-500 mb-6 italic">
             Access is gated by Google OAuth and the{" "}
