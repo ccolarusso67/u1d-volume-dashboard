@@ -977,39 +977,6 @@ function NarrativeSeverityBadge({ severity }: { severity: NarrativeSeverity }) {
   );
 }
 
-function TrendBars({ title, rows }: { title: string; rows: { period_year: number; period_month: number; label: string; total_gallons: number; is_locked: boolean }[] }) {
-  if (rows.length === 0) {
-    return (
-      <div>
-        <h3 className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">{title}</h3>
-        <div className="text-sm italic text-gray-400">No data.</div>
-      </div>
-    );
-  }
-  const max = rows.reduce((m, r) => Math.max(m, r.total_gallons), 0) || 1;
-  return (
-    <div>
-      <h3 className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">{title}</h3>
-      <div className="flex items-end gap-1 h-32">
-        {rows.map((r) => (
-          <div key={`${r.period_year}-${r.period_month}`} className="flex-1 flex flex-col items-center justify-end h-full"
-            title={`${r.label}: ${fmtNum(r.total_gallons)} gal${r.is_locked ? "" : " (not locked)"}`}>
-            <div className={`w-full ${r.is_locked ? "bg-navy" : "bg-white border border-navy/40"}`}
-              style={{ height: `${(r.total_gallons / max) * 100}%`, minHeight: r.total_gallons > 0 ? "2px" : "0" }} />
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-1 mt-2 text-[10px] text-gray-500">
-        {rows.map((r) => (
-          <div key={`${r.period_year}-${r.period_month}-lbl`} className="flex-1 text-center truncate">
-            {monthShort(r.period_month)}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function monthShort(m: number): string {
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return names[m - 1] ?? `M${m}`;
