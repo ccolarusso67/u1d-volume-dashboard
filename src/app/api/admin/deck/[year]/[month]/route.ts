@@ -29,11 +29,14 @@ import {
   generateMonthlyDeckV2,
   deckFilenameV2,
 } from "@/lib/deck/generate-monthly-deck-v2";
+import { buildDeckTokens, fillTemplateDeck } from "@/lib/deck/fill-template-deck";
+import { readFile } from "fs/promises";
+import path from "path";
 
 type Params = { year: string; month: string };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<Params> }
 ) {
   const a = await requireAdminSession(() => auth());
@@ -77,8 +80,23 @@ export async function GET(
     );
   }
 
+  // Opt-in template-fill engine (?engine=template). Default stays the
+  // procedural generator so the live download/email path is unchanged.
+  const useTemplate = req.nextUrl.searchParams.get("engine") === "template";
+
   try {
-    const buffer = await generateMonthlyDeckV2(view);
+    let buffer: Buffer;
+    if (useTemplate) {
+      const tplPath = path.join(
+        process.cwd(),
+        "board-template",
+        "U1Dynamics_Board_Template_TOKENIZED.pptx"
+      );
+      const tpl = await readFile(tplPath);
+      buffer = await fillTemplateDeck(tpl, buildDeckTokens(view));
+    } else {
+      buffer = await generateMonthlyDeckV2(view);
+    }
     const filename = deckFilenameV2(view);
 
     return new NextResponse(
