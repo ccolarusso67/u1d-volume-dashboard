@@ -89,10 +89,15 @@ export function buildDeckTokens(view: BoardExecutiveDashboard): Record<string, s
     t.AR_FULL = moneyFull(wc.total_ar);
     t.AP_FULL = moneyFull(wc.total_ap);
     t.AP_AR_RATIO = wc.ap_to_ar_ratio !== null ? wc.ap_to_ar_ratio.toFixed(1) : NA;
+    // Slide 4 — margin detail
+    const cur = f.current;
+    t.CURRENT_MARGIN = cur && cur.income ? pctOf(cur.gross_profit / cur.income) : NA;
+    t.GP_PER_POINT = moneyShort(tm.income / 100); // ≈ gross profit per 1pt of GM
   } else {
     Object.assign(t, {
       REVENUE_TTM: NA, GROSS_MARGIN: NA, NET_INCOME_TTM: NA,
       NWC_SHORT: NA, NWC_FULL: NA, AR_FULL: NA, AP_FULL: NA, AP_AR_RATIO: NA,
+      CURRENT_MARGIN: NA, GP_PER_POINT: NA,
     });
   }
   return t;
