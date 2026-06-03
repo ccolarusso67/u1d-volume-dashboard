@@ -38,7 +38,7 @@ export function KpiCard({
   const isNegative = /^\s*[-−(]/.test(value);
   return (
     <div
-      className={`relative h-full min-h-[142px] bg-white border border-gray-200 rounded-sm shadow-sm ${className}`}
+      className={`relative h-full min-h-[142px] bg-white border border-line rounded-lg shadow-sm ${className}`}
     >
       {/* Top accent stripe */}
       <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-sm ${ACCENT[tone]}`} />

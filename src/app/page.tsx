@@ -186,7 +186,7 @@ export default async function DashboardPage() {
         )}
 
         {/* 6-Month Stacked Trend Chart */}
-        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+        <section className="bg-white border border-line rounded-xl p-6 mb-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
             6-Month Volume Trend
           </h2>
@@ -209,13 +209,13 @@ export default async function DashboardPage() {
         </section>
 
         {/* Customer Detail with YoY */}
-        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+        <section className="bg-white border border-line rounded-xl p-6 mb-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
             Customer Detail — {formatPeriod(latest.period_year, latest.period_month)} vs {formatPeriod(yearAgo.year, yearAgo.month)}
           </h2>
           <table className="w-full text-sm mt-4">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+              <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
                 <th className="text-left pb-2 font-medium">Customer</th>
                 <th className="text-right pb-2 font-medium">{formatPeriod(yearAgo.year, yearAgo.month)}</th>
                 <th className="text-right pb-2 font-medium">{formatPeriod(latest.period_year, latest.period_month)}</th>
@@ -254,7 +254,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* Package Mix chart + table side by side */}
-        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+        <section className="bg-white border border-line rounded-xl p-6 mb-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
             Package Mix — {formatPeriod(latest.period_year, latest.period_month)}
           </h2>
@@ -266,7 +266,7 @@ export default async function DashboardPage() {
             <div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                  <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
                     <th className="text-left pb-2 font-medium">#</th>
                     <th className="text-left pb-2 font-medium">Category</th>
                     <th className="text-right pb-2 font-medium">% Month</th>
@@ -294,7 +294,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* YoY Drivers chart + drags context */}
-        <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+        <section className="bg-white border border-line rounded-xl p-6 mb-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
             YoY Drivers — by Package
           </h2>
