@@ -50,7 +50,7 @@ export default async function ReconciliationAdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Card label="P&L income (TTM)" value={moneyM(r.pnlIncomeTtm)} sub="QuickBooks P&L · u1dynamics · accrual" tone="navy" />
               <Card label="Invoice gross — U1Dynamics" value={moneyM(r.u1dInvoiceGross)} sub={ratio ? `${ratio.toFixed(2)}× the P&L` : "—"} tone={ratio && ratio > 1.3 ? "red" : "navy"} />
-              <Card label="Invoice gross — all companies" value={moneyM(r.allCompaniesInvoiceGross)} sub={allRatio ? `${allRatio.toFixed(2)}× the P&L` : "—"} tone={allRatio && allRatio > 1.7 ? "red" : "navy"} />
+              <Card label="Invoice gross — Ultrachem + U1D" value={moneyM(r.allCompaniesInvoiceGross)} sub={allRatio ? `${allRatio.toFixed(2)}× the P&L` : "—"} tone={allRatio && allRatio > 1.7 ? "red" : "navy"} />
               <Card label="QB sales-by-customer (TTM)" value={moneyM(r.salesByCustomerTtm)} sub="u1dynamics rollup" tone="navy" />
             </div>
 
@@ -63,7 +63,7 @@ export default async function ReconciliationAdminPage() {
             </div>
 
             {/* Invoice gross by company */}
-            <Panel title="Gross invoice revenue by company (TTM)" note="If the ~$19.7M only appears when these rows are summed, the figure was all five companies, not U1Dynamics.">
+            <Panel title="Gross invoice revenue by company (TTM)" note="Scoped to Ultrachem + U1Dynamics. The ~$19.7M/$24M figure was these two summed, not U1Dynamics alone.">
               <table className="w-full text-sm">
                 <thead><tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
                   <th className="text-left pb-2">Company</th><th className="text-right pb-2">Gross invoice revenue</th><th className="text-right pb-2">Invoices</th>
@@ -125,7 +125,7 @@ function diagnose(r: Awaited<ReturnType<typeof getRevenueReconciliation>>): stri
   const u = r.u1dInvoiceGross / r.pnlIncomeTtm;
   const a = r.allCompaniesInvoiceGross / r.pnlIncomeTtm;
   if (u <= 1.15) {
-    return `U1Dynamics gross invoice revenue (${moneyM(r.u1dInvoiceGross)}) is close to P&L income (${moneyM(r.pnlIncomeTtm)}). The ~$19.7M figure was almost certainly all five companies combined (${moneyM(r.allCompaniesInvoiceGross)}, ${a.toFixed(1)}× the P&L) — a missing company filter, not a real discrepancy. Per-customer dollars are board-grade once scoped to U1Dynamics.`;
+    return `U1Dynamics gross invoice revenue (${moneyM(r.u1dInvoiceGross)}) is close to P&L income (${moneyM(r.pnlIncomeTtm)}). The ~$19.7M figure was Ultrachem and U1Dynamics combined (${moneyM(r.allCompaniesInvoiceGross)}, ${a.toFixed(1)}× the P&L), a missing company filter, not a real discrepancy. Per-customer dollars are board-grade once scoped to U1Dynamics.`;
   }
   return `U1Dynamics gross invoice revenue (${moneyM(r.u1dInvoiceGross)}) is ${u.toFixed(2)}× the P&L income (${moneyM(r.pnlIncomeTtm)}) — so the gap is within U1Dynamics. Check the by-customer table for intercompany accounts and the by-class table for freight/tax/discount lines; those two should account for most of the difference between gross invoices and net P&L income.`;
 }

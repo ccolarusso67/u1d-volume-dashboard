@@ -64,7 +64,8 @@ export async function getRevenueReconciliation(): Promise<RevenueReconciliation>
       `SELECT il.company_id, COALESCE(SUM(il.line_total),0)::float8 AS revenue,
               COUNT(DISTINCT i.txn_id)::int AS invoices
          FROM invoice_lines il JOIN invoices i ON i.txn_id = il.invoice_txn_id
-        WHERE i.txn_date >= ($1::date - INTERVAL '11 months') AND i.txn_date < ($1::date + INTERVAL '1 month')
+        WHERE il.company_id = ANY(ARRAY['u1p_ultrachem','u1dynamics'])
+          AND i.txn_date >= ($1::date - INTERVAL '11 months') AND i.txn_date < ($1::date + INTERVAL '1 month')
         GROUP BY il.company_id ORDER BY 2 DESC`, [end]),
     safeQuery<PnlCompanyRow>(pool,
       `SELECT company_id, COALESCE(SUM(income),0)::float8 AS income FROM monthly_pnl

@@ -181,8 +181,10 @@ export default async function ProductionPage({
           <div className="text-xs text-gray-500 mb-4">
             {marginRange === "month" ? "Latest invoice month" : `Trailing ${rangeLabel(marginRange)}`}
             {margin.windowEnd ? ` ending ${margin.windowEnd.slice(0, 7)}` : ""} ·
-            Revenue − product COGS from QuickBooks (u1dynamics), attributed to each
-            line. Excludes filling labor &amp; line overhead (Version B).
+            Revenue − product COGS from QuickBooks (Ultrachem + U1Dynamics combined),
+            attributed to each filling line. Excludes filling labor &amp; line overhead (Version B).
+            Note: the U1Dynamics→Ultrachem intercompany flow is not yet eliminated, so
+            combined revenue is somewhat overstated; margin % is the more reliable read.
           </div>
 
           {!margin.configured ? (

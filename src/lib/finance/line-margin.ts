@@ -26,9 +26,19 @@
  * the correct granularity for a margin view — you can't split a Line-3
  * gallon into oil vs coolant from billing data alone.
  */
-import { getFinancePool, U1D_COMPANY_ID } from "./db-pool";
+import { getFinancePool } from "./db-pool";
 import { getPool } from "../db-pool";
 import { safeQuery, safeQueryOne } from "./safe-query";
+
+/**
+ * Entities included in the filling-line margin view. Production happens under
+ * U1Dynamics, but real market revenue is booked under Ultrachem (U1Dynamics
+ * sells most of its output intercompany to Ultrachem, which then sells to the
+ * market). So margin per line must span both entities. Deliberately NOT the
+ * full five-company set, and deliberately NOT routed through U1D_COMPANY_ID
+ * (that constant stays pinned to 'u1dynamics' for every other U1D-scoped view).
+ */
+export const MARGIN_COMPANY_IDS = ["u1p_ultrachem", "u1dynamics"];
 
 // ---------------------------------------------------------------------------
 // Classification rules — product string -> production parent line.
@@ -130,12 +140,12 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     return { ...EMPTY, months: m }; // U1D_FINANCE_DATABASE_URL not set
   }
 
-  // Window anchored on the latest invoice month for the U1Dynamics entity.
+  // Window anchored on the latest invoice month across the included entities.
   const maxRow = await safeQueryOne<{ d: string | null }>(
     financePool,
     `SELECT TO_CHAR(DATE_TRUNC('month', MAX(i.txn_date)),'YYYY-MM-DD') AS d
-       FROM invoices i WHERE i.company_id = $1`,
-    [U1D_COMPANY_ID]
+       FROM invoices i WHERE i.company_id = ANY($1)`,
+    [MARGIN_COMPANY_IDS]
   );
   const end = maxRow?.d ?? null;
   if (!end) return { ...EMPTY, configured: true, months: m };
@@ -155,12 +165,12 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     JOIN invoices i ON i.txn_id = il.invoice_txn_id
     LEFT JOIN product_catalog pc
       ON pc.item_id = il.item_id AND pc.company_id = il.company_id
-    WHERE il.company_id = $1
+    WHERE il.company_id = ANY($1)
       AND i.txn_date >= ($2::date - make_interval(months => $3 - 1))
       AND i.txn_date <  ($2::date + INTERVAL '1 month')
     GROUP BY 1, 2
     `,
-    [U1D_COMPANY_ID, end, m]
+    [MARGIN_COMPANY_IDS, end, m]
   );
 
   // Produced gallons per parent line over the same window (main pool, u1d_ops).
