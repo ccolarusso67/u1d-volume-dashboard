@@ -34,6 +34,8 @@ const ACCENT: Record<Tone, string> = {
 export function KpiCard({
   label, value, sub, tone = "navy", badge, className = "",
 }: Props) {
+  // Any negative value renders in red (leading hyphen, unicode minus, or paren).
+  const isNegative = /^\s*[-−(]/.test(value);
   return (
     <div
       className={`relative h-full min-h-[142px] bg-white border border-gray-200 rounded-sm shadow-sm ${className}`}
@@ -47,7 +49,7 @@ export function KpiCard({
           </div>
           {badge && <div className="shrink-0">{badge}</div>}
         </div>
-        <div className="font-heading text-[1.75rem] md:text-[2rem] font-bold text-navy leading-none mt-3 tabular-nums">
+        <div className={`font-heading text-[1.75rem] md:text-[2rem] font-bold leading-none mt-3 tabular-nums ${isNegative ? "text-red-600" : "text-navy"}`}>
           {value}
         </div>
         {sub && (

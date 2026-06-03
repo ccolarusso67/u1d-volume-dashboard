@@ -18,6 +18,7 @@ export function KPITile({
   subtitle,
   accent = "navy",
 }: KPITileProps) {
+  const isNegative = /^\s*[-−(]/.test(value);
   return (
     <div
       className={`bg-white border border-gray-200 border-t-4 ${ACCENT_CLASSES[accent]} rounded-sm shadow-sm px-5 py-4`}
@@ -25,7 +26,7 @@ export function KPITile({
       <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">
         {label}
       </div>
-      <div className="font-heading text-3xl font-bold text-navy leading-tight">
+      <div className={`font-heading text-3xl font-bold leading-tight ${isNegative ? "text-red-600" : "text-navy"}`}>
         {value}
       </div>
       {subtitle && (
