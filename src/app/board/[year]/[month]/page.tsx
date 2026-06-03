@@ -257,6 +257,28 @@ export default async function BoardDashboardPage({
     { label: "vs 6 months ago", ref: bBilledByOrd.get(boardOrd - 6) ?? null },
     { label: "vs year ago", ref: bBilledByOrd.get(boardOrd - 12) ?? null },
   ];
+
+  // Range-aware comparison for the Executive Summary tiles. Sum exact calendar
+  // windows from the billed series so Month/3M/6M/YoY all behave consistently.
+  const sumWindow = (endOrd: number, mo: number): number | null => {
+    let s = 0;
+    let any = false;
+    for (let k = 0; k < mo; k++) {
+      const v = bBilledByOrd.get(endOrd - k);
+      if (v != null) { s += v; any = true; }
+    }
+    return any ? s : null;
+  };
+  const winCur = sumWindow(boardOrd, boardMonths);
+  const winPrevPeriod = sumWindow(boardOrd - boardMonths, boardMonths); // immediately preceding window
+  const winYearAgo = sumWindow(boardOrd - 12, boardMonths); // same window one year earlier
+  const popPct = winCur != null && winPrevPeriod ? (winCur - winPrevPeriod) / winPrevPeriod : null;
+  const popDelta = winCur != null && winPrevPeriod != null ? winCur - winPrevPeriod : null;
+  const yoyPctWin = winCur != null && winYearAgo ? (winCur - winYearAgo) / winYearAgo : null;
+  const yoyDeltaWin = winCur != null && winYearAgo != null ? winCur - winYearAgo : null;
+  const popLabel = boardMonths === 1 ? "Month over month" : `Period over period${winSuffix}`;
+  const yoyLabel = boardMonths === 1 ? "Year over year" : `Year over year${winSuffix}`;
+  const popSubUnit = boardMonths === 1 ? "vs prior month" : `vs prior ${rangeLabel(boardRange)}`;
   const boardVolGoalSeries = view.trend12.map((t) => {
     const wd = wdByPeriod.get(`${t.period_year}-${t.period_month}`);
     return {
@@ -340,27 +362,26 @@ export default async function BoardDashboardPage({
       {/* 1. Executive snapshot — 8 KPI cards */}
       <SectionCard
         title="Executive Summary"
-        subtitle="Locked-only data. YoY uses the same month one year prior; superseded versions are excluded."
+        subtitle="Locked-only data. Comparison tiles follow the selected range (Month / 3M / 6M / YoY); superseded versions are excluded."
       >
         <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="Total gallons" value={fmtNum(h.total_gallons)} sub="this month" tone="navy" />
           <KpiCard
-            label="Month over month"
-            value={view.priorMonth ? fmtPct(view.priorMonth.delta_pct) : "—"}
-            sub={view.priorMonth ? `${formatSigned(view.priorMonth.delta_gallons)} vs prior month` : "no prior month locked"}
-            tone={
-              view.priorMonth?.delta_pct === undefined || view.priorMonth?.delta_pct === null ? "navy"
-                : view.priorMonth.delta_pct >= 0 ? "ok" : "warn"
-            }
+            label={boardMonths === 1 ? "Total gallons" : `Total gallons${winSuffix}`}
+            value={fmtNum(boardMonths === 1 ? h.total_gallons : (winCur ?? h.total_gallons))}
+            sub={boardMonths === 1 ? "this month" : `trailing ${rangeLabel(boardRange)}`}
+            tone="navy"
           />
           <KpiCard
-            label="Year over year"
-            value={view.priorYear ? fmtPct(view.priorYear.delta_pct) : "—"}
-            sub={view.priorYear ? `${formatSigned(view.priorYear.delta_gallons)} vs same month ${year - 1}` : "no prior year locked"}
-            tone={
-              view.priorYear?.delta_pct === undefined || view.priorYear?.delta_pct === null ? "navy"
-                : view.priorYear.delta_pct >= 0 ? "ok" : "warn"
-            }
+            label={popLabel}
+            value={popPct === null ? "—" : fmtPct(popPct)}
+            sub={popDelta === null ? `no prior ${boardMonths === 1 ? "month" : "window"} locked` : `${formatSigned(popDelta)} ${popSubUnit}`}
+            tone={popPct === null ? "navy" : popPct >= 0 ? "ok" : "warn"}
+          />
+          <KpiCard
+            label={yoyLabel}
+            value={yoyPctWin === null ? "—" : fmtPct(yoyPctWin)}
+            sub={yoyDeltaWin === null ? "no prior year locked" : `${formatSigned(yoyDeltaWin)} vs ${year - 1}`}
+            tone={yoyPctWin === null ? "navy" : yoyPctWin >= 0 ? "ok" : "warn"}
           />
           <KpiCard
             label="YTD gallons"
