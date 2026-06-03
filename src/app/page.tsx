@@ -12,6 +12,7 @@ import { getVolumeGoal } from "@/lib/queries/volume-goal";
 import { getReconciliation } from "@/lib/queries/production";
 import { getDailyTargetGallons } from "@/lib/settings/app-settings";
 import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
+import { MixDonut, MIX_COLORS } from "@/components/charts/MixDonut";
 
 const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
@@ -110,6 +111,16 @@ export default async function DashboardPage() {
     }
     return row;
   });
+
+  // Product-mix donut (latest period category share) + customer concentration.
+  const latestCatRow = stackedData[stackedData.length - 1];
+  const donutData = latestCatRow
+    ? CATEGORIES.map((c) => ({ name: c, value: Number(latestCatRow[c] ?? 0) })).filter((d) => d.value > 0)
+    : [];
+  const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
+  const topConcentration = customers.slice().sort((a, b) => b.current_gallons - a.current_gallons).slice(0, 5);
+  const concMax = topConcentration.length ? topConcentration[0].current_gallons : 1;
+
   // Driver chart wants biggest at top => largest delta first
   const driverData = positiveDrivers.map(d => ({
     package: d.display_name,
@@ -184,6 +195,54 @@ export default async function DashboardPage() {
             <VolumeGoalChart data={volGoalSeries} />
           </section>
         )}
+
+        {/* Product mix + customer concentration */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <section className="bg-white border border-line rounded-xl p-6">
+            <h2 className="font-heading text-xl font-bold text-navy">Product mix</h2>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1 mb-3">
+              {formatPeriod(latest.period_year, latest.period_month)} · share of gallons
+            </div>
+            {donutData.length > 0 ? (
+              <>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-2">
+                  {donutData.map((d, i) => (
+                    <span key={d.name} className="flex items-center gap-1.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: MIX_COLORS[i % MIX_COLORS.length] }} />
+                      {d.name} {fmtPct(d.value / donutTotal, 1, false)}
+                    </span>
+                  ))}
+                </div>
+                <MixDonut data={donutData} />
+              </>
+            ) : (
+              <div className="text-sm italic text-gray-400 py-8 text-center">No category data.</div>
+            )}
+          </section>
+
+          <section className="bg-white border border-line rounded-xl p-6">
+            <h2 className="font-heading text-xl font-bold text-navy">Customer concentration</h2>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1 mb-4">
+              {formatPeriod(latest.period_year, latest.period_month)} · top accounts by gallons
+            </div>
+            {topConcentration.map((c) => {
+              const share = latest.total_gallons > 0 ? c.current_gallons / latest.total_gallons : 0;
+              const w = concMax > 0 ? (c.current_gallons / concMax) * 100 : 0;
+              return (
+                <div key={c.customer_key} className="flex items-center gap-3 my-2.5 text-sm">
+                  <div className="w-40 truncate text-navy">
+                    {c.display_name}
+                    {c.is_intercompany && <span className="text-[#1C6FB8] text-[11px]"> · intercompany</span>}
+                  </div>
+                  <div className="flex-1 h-2.5 bg-gray-100 rounded overflow-hidden">
+                    <div className="h-full rounded" style={{ width: `${w}%`, background: c.is_intercompany ? "#1C6FB8" : "#15385D" }} />
+                  </div>
+                  <div className="w-12 text-right font-bold text-navy tabular-nums">{fmtPct(share, 1, false)}</div>
+                </div>
+              );
+            })}
+          </section>
+        </div>
 
         {/* 6-Month Stacked Trend Chart */}
         <section className="bg-white border border-line rounded-xl p-6 mb-6">
