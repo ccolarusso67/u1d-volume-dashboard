@@ -38,9 +38,11 @@ const ERR: Record<string, string> = {
 export function UsersManager({
   initialUsers,
   currentEmail,
+  initialDailyTarget,
 }: {
   initialUsers: ManagedUser[];
   currentEmail: string;
+  initialDailyTarget: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -52,6 +54,31 @@ export function UsersManager({
   const [newRole, setNewRole] = useState<ManagedRole>("viewer");
   // per-row password inputs
   const [pw, setPw] = useState<Record<string, string>>({});
+  // volume-goal daily target
+  const [dailyTarget, setDailyTarget] = useState(String(initialDailyTarget));
+
+  async function saveDailyTarget() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailyTarget: Number(dailyTarget) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setNotice({ kind: "err", text: "Could not save the daily target." });
+      } else {
+        setNotice({ kind: "ok", text: "Daily volume target updated." });
+        router.refresh();
+      }
+    } catch {
+      setNotice({ kind: "err", text: ERR.internal_error });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function post(body: Record<string, unknown>, okMsg: string) {
     setBusy(true);
@@ -94,6 +121,37 @@ export function UsersManager({
           {notice.text}
         </div>
       )}
+
+      {/* Volume goal setting */}
+      <section className="bg-white border border-gray-200 rounded-sm p-5">
+        <h2 className="font-heading text-lg font-bold text-navy mb-3">Volume goal</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Daily target (gallons/day)
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={dailyTarget}
+              onChange={(e) => setDailyTarget(e.target.value)}
+              className="w-40 border border-gray-300 rounded-sm px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            disabled={busy || !(Number(dailyTarget) > 0)}
+            onClick={saveDailyTarget}
+            className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm px-4 py-2 rounded-sm"
+          >
+            Save
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-3">
+          Monthly goal = working days that month × this daily target. The delta vs actual
+          volume shows green when met or surpassed, red when below — on the board page,
+          the dashboard, and the deck.
+        </p>
+      </section>
 
       {/* Add user */}
       <section className="bg-white border border-gray-200 rounded-sm p-5">

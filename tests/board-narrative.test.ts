@@ -120,6 +120,7 @@ function makeDashboard(overrides?: Partial<BoardExecutiveDashboard>): BoardExecu
     },
     lockHistory: [],
     finance: null,
+    volumeGoal: null,
   };
 
   return { ...base, ...(overrides ?? {}) };

@@ -24,6 +24,7 @@ import { listPeriodEvents } from "../review/list-period-events";
 import { getOperatorNotes } from "../operator-notes/get-operator-notes";
 import { SECTION_KEYS, type SectionKey } from "../operator-notes/types";
 import { monthLabel, priorMonth } from "./metrics";
+import { getVolumeGoal } from "../queries/volume-goal";
 import type { BoardPeriodView } from "./types";
 import type {
   BoardExecutiveDashboard,
@@ -560,6 +561,10 @@ export async function getBoardExecutiveDashboard(
   const financeLoader = opts.financeOverlayLoader ?? loadFinanceOverlay;
   const finance = await financeLoader(year, month);
 
+  // Monthly volume goal (working_days * editable daily target). Never blocks
+  // the dashboard: a failure here degrades to null.
+  const volumeGoal = await getVolumeGoal(year, month).catch(() => null);
+
   return {
     period: periodInfo,
     readiness: { ready, blockers },
@@ -615,6 +620,7 @@ export async function getBoardExecutiveDashboard(
       filename: e.filename,
     })),
     finance,
+    volumeGoal,
   };
 }
 

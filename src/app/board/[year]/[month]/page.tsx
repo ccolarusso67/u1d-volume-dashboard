@@ -314,6 +314,26 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
               : "no prior YTD"}
             tone={view.ytd.delta_pct === null ? "navy" : view.ytd.delta_pct >= 0 ? "ok" : "warn"}
           />
+          {view.volumeGoal?.goal_gallons != null && (
+            <KpiCard
+              label="Volume goal"
+              value={fmtNum(view.volumeGoal.goal_gallons)}
+              sub={`${view.volumeGoal.working_days} days × ${fmtNum(view.volumeGoal.daily_target)} gal/day`}
+              tone="navy"
+            />
+          )}
+          {view.volumeGoal?.delta_gallons != null && (
+            <KpiCard
+              label="Goal delta"
+              value={formatSigned(view.volumeGoal.delta_gallons)}
+              sub={
+                view.volumeGoal.met
+                  ? `goal surpassed${view.volumeGoal.delta_pct !== null ? ` · ${fmtPct(view.volumeGoal.delta_pct)}` : ""}`
+                  : `below goal${view.volumeGoal.delta_pct !== null ? ` · ${fmtPct(view.volumeGoal.delta_pct)}` : ""}`
+              }
+              tone={view.volumeGoal.met ? "ok" : "warn"}
+            />
+          )}
           <KpiCard label="Customers" value={fmtNum(h.customer_count)} sub="active this period" tone="neutral" />
           <KpiCard label="Package types" value={fmtNum(h.package_count)} sub="distinct" tone="neutral" />
           <KpiCard label="Alerts resolved" value={fmtNum(view.alertSummary.resolved_alerts_total)} sub="during close" tone="ok" />

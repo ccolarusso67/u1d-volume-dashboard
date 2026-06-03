@@ -39,6 +39,7 @@ const baseView: BoardExecutiveDashboard = {
   alertSummary: { package_alerts_total: 0, customer_alerts_total: 0, data_quality_alerts_total: 0, resolved_alerts_total: 0, pending_alerts_total: 0 },
   lockHistory: [],
   finance: null,
+  volumeGoal: null,
 };
 
 function withFinance(over: Partial<BoardFinanceOverlay>): BoardExecutiveDashboard {

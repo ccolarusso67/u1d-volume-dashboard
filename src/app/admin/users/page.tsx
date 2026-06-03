@@ -10,6 +10,7 @@ import { auth } from "@/auth";
 import { Nav } from "@/components/nav";
 import { HeroHeader } from "@/components/layout/hero-header";
 import { listUsers } from "@/lib/users/manage-users";
+import { getDailyTargetGallons } from "@/lib/settings/app-settings";
 import { UsersManager } from "@/components/admin/users-manager";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function AdminUsersPage() {
   }
 
   const users = await listUsers();
+  const dailyTarget = await getDailyTargetGallons();
 
   return (
     <main>
@@ -34,7 +36,11 @@ export default async function AdminUsersPage() {
       />
       <Nav current="/admin" />
       <div className="container mx-auto px-8 py-8 max-w-5xl">
-        <UsersManager initialUsers={users} currentEmail={session.user.email} />
+        <UsersManager
+          initialUsers={users}
+          currentEmail={session.user.email}
+          initialDailyTarget={dailyTarget}
+        />
         <p className="text-xs text-gray-500 italic mt-6">
           Admins can upload and lock the monthly close; viewers have read-only access.
           Sign-in requires an active account with a password set here.

@@ -8,6 +8,7 @@ import {
   getMonthlyCategoryTrend,
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
+import { getVolumeGoal } from "@/lib/queries/volume-goal";
 import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
 import { CATEGORY_DISPLAY_ORDER } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
@@ -60,6 +61,8 @@ export default async function DashboardPage() {
       getMonthlyCategoryTrend(6),
     ]);
 
+  const volumeGoal = await getVolumeGoal(latest.period_year, latest.period_month);
+
   const momPct = prevMonthData
     ? (latest.total_gallons - prevMonthData.total_gallons) / prevMonthData.total_gallons
     : null;
@@ -109,10 +112,22 @@ export default async function DashboardPage() {
       <Nav current="/" />
 
       <div className="container mx-auto px-8 py-8 max-w-7xl">
-        {/* 5 KPI tiles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        {/* KPI tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
           <KPITile label="Month Volume" value={fmtNum(latest.total_gallons)}
             subtitle="gallons billed" accent="navy" />
+          {volumeGoal.goal_gallons != null && (
+            <KPITile
+              label="Volume Goal"
+              value={fmtNum(volumeGoal.goal_gallons)}
+              subtitle={
+                volumeGoal.delta_gallons != null
+                  ? `${volumeGoal.delta_gallons >= 0 ? "+" : "−"}${fmtNum(Math.abs(volumeGoal.delta_gallons))} gal · ${volumeGoal.met ? "surpassed" : "below"} (${volumeGoal.working_days}d × ${fmtNum(volumeGoal.daily_target)})`
+                  : `${volumeGoal.working_days ?? "—"} days × ${fmtNum(volumeGoal.daily_target)}/day`
+              }
+              accent={volumeGoal.met ? "success" : "red"}
+            />
+          )}
           <KPITile label="MoM Change" value={fmtPct(momPct)}
             subtitle={prevMonthData ? `vs ${fmtNum(prevMonthData.total_gallons)} gal` : "no prior month"}
             accent={momPct !== null && momPct >= 0 ? "success" : "red"} />

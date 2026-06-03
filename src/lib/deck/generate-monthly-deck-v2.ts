@@ -385,6 +385,27 @@ function buildVolumeDetail(
       fontFace: FT, fontSize: 24, bold: true, color: B.navy });
   });
 
+  // Monthly volume goal (working_days × daily target) — colored callout, top-right.
+  const vg = view.volumeGoal;
+  if (vg && vg.goal_gallons != null) {
+    const met = vg.met === true;
+    const deltaTxt =
+      vg.delta_gallons != null
+        ? `${vg.delta_gallons >= 0 ? "+" : "−"}${formatGallons(Math.abs(vg.delta_gallons))} gal`
+        : "—";
+    slide.addText(`MONTHLY GOAL ${formatGallons(vg.goal_gallons)} gal  ·  Δ ${deltaTxt}`, {
+      x: 6.8, y: 0.40, w: SLIDE_W - 6.8 - MARGIN_X, h: 0.3, align: "right",
+      fontFace: FB, fontSize: 11, bold: true, color: met ? B.ok : B.red,
+    });
+    slide.addText(
+      `${vg.working_days ?? "—"} working days × ${formatGallons(vg.daily_target)} gal/day · ${met ? "goal surpassed" : "below goal"}`,
+      {
+        x: 6.8, y: 0.72, w: SLIDE_W - 6.8 - MARGIN_X, h: 0.25, align: "right",
+        fontFace: FB, fontSize: 8, color: B.mutedText,
+      }
+    );
+  }
+
   // 12-month trend bars
   const chartY = 2.45;
   const chartH = 3.0;

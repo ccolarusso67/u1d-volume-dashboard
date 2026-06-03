@@ -17,6 +17,7 @@ import type {
   SyncHealthRow,
 } from "../finance/types";
 import type { SyncHealthAssessment } from "../finance/get-sync-health";
+import type { VolumeGoal } from "../queries/volume-goal";
 
 export type ExecMetricSet = {
   total_gallons: number;
@@ -163,4 +164,8 @@ export type BoardExecutiveDashboard = {
   // ---- Finance overlay (PR 012B) ----
   /** Canonical money view from u1p_finance. null if not configured / unreachable / no data. */
   finance: BoardFinanceOverlay | null;
+
+  // ---- Monthly volume goal (working_days * editable daily target) ----
+  /** null if the reconciliation MV has no row for this period. */
+  volumeGoal: VolumeGoal | null;
 };
