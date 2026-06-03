@@ -54,14 +54,10 @@ export default async function DashboardPage(props: {
     );
   }
 
-  const prevMonth = latest.period_month === 1
-    ? { year: latest.period_year - 1, month: 12 }
-    : { year: latest.period_year, month: latest.period_month - 1 };
   const yearAgo = { year: latest.period_year - 1, month: latest.period_month };
 
-  const [prevMonthData, yearAgoData, customers, packages, drivers, ytd, trend6m, categoryTrend] =
+  const [yearAgoData, customers, packages, drivers, ytd, trend6m, categoryTrend] =
     await Promise.all([
-      getMonth(prevMonth.year, prevMonth.month),
       getMonth(yearAgo.year, yearAgo.month),
       getCustomerYoYForMonth(latest.period_year, latest.period_month),
       getPackageMixForMonth(latest.period_year, latest.period_month),
@@ -98,14 +94,9 @@ export default async function DashboardPage(props: {
   const windowSuffix = months === 1 ? "" : ` · ${rangeLabel(range)}`;
   const windowAgg = await getWindowAggregates(months);
 
-  const momPct = prevMonthData
-    ? (latest.total_gallons - prevMonthData.total_gallons) / prevMonthData.total_gallons
-    : null;
   const yoyPct = yearAgoData
     ? (latest.total_gallons - yearAgoData.total_gallons) / yearAgoData.total_gallons
     : null;
-  const ultrachemShare = latest.total_gallons > 0
-    ? latest.ultrachem_gallons / latest.total_gallons : 0;
 
   const positiveDrivers = drivers.filter(d => d.delta_gallons > 0).slice(0, 6);
   const negativeDrivers = drivers
@@ -157,6 +148,24 @@ export default async function DashboardPage(props: {
     { label: "vs year ago", ref: billedByOrd.get(curOrd - 12) ?? null },
   ];
 
+  // Windowed comparison KPIs: current window vs prior equal window, and vs the
+  // same window one year back. For range=Month these equal MoM / YoY.
+  const sumOrds = (fromOrd: number, toOrd: number) => {
+    let s = 0;
+    for (let o = fromOrd; o <= toOrd; o++) s += billedByOrd.get(o) ?? 0;
+    return s;
+  };
+  const winCur = sumOrds(curOrd - months + 1, curOrd);
+  const winPrior = sumOrds(curOrd - 2 * months + 1, curOrd - months);
+  const winYoY = sumOrds(curOrd - months + 1 - 12, curOrd - 12);
+  const periodChange = winPrior > 0 ? (winCur - winPrior) / winPrior : null;
+  const yoyChangeWin = winYoY > 0 ? (winCur - winYoY) / winYoY : null;
+  const interGal = windowAgg.byCustomer
+    .filter((c) => c.is_intercompany)
+    .reduce((s, c) => s + c.gallons, 0);
+  const ultraShareWin = windowAgg.total_gallons > 0 ? interGal / windowAgg.total_gallons : 0;
+  const changeLabel = months === 1 ? "MoM change" : `${rangeLabel(range)} change`;
+
   // Driver chart wants biggest at top => largest delta first
   const driverData = positiveDrivers.map(d => ({
     package: d.display_name,
@@ -200,14 +209,24 @@ export default async function DashboardPage(props: {
               accent={windowMet ? "success" : "red"}
             />
           )}
-          <KPITile label="MoM Change" value={fmtPct(momPct)}
-            subtitle={prevMonthData ? `vs ${fmtNum(prevMonthData.total_gallons)} gal` : "no prior month"}
-            accent={momPct !== null && momPct >= 0 ? "success" : "red"} />
-          <KPITile label="YoY Change" value={fmtPct(yoyPct)}
-            subtitle={yearAgoData ? `vs ${fmtNum(yearAgoData.total_gallons)} gal` : "no prior year"}
-            accent={yoyPct !== null && yoyPct >= 0 ? "success" : "red"} />
-          <KPITile label="ULTRACHEM Share" value={fmtPct(ultrachemShare, 1, false)}
-            subtitle="intercompany customer" accent="navy" />
+          <KPITile
+            label={changeLabel}
+            value={periodChange !== null ? fmtPct(periodChange) : "—"}
+            subtitle={months === 1 ? `vs ${fmtNum(winPrior)} gal` : `vs prior ${rangeLabel(range)} · ${fmtNum(winPrior)} gal`}
+            accent={periodChange === null ? "neutral" : periodChange >= 0 ? "success" : "red"}
+          />
+          <KPITile
+            label="YoY Change"
+            value={yoyChangeWin !== null ? fmtPct(yoyChangeWin) : "—"}
+            subtitle={winYoY > 0 ? `vs ${fmtNum(winYoY)} gal a year ago` : "no prior-year data"}
+            accent={yoyChangeWin === null ? "neutral" : yoyChangeWin >= 0 ? "success" : "red"}
+          />
+          <KPITile
+            label={`ULTRACHEM Share${windowSuffix}`}
+            value={fmtPct(ultraShareWin, 1, false)}
+            subtitle="intercompany customer"
+            accent="navy"
+          />
           <KPITile label={ytdLabel(latest.period_month)} value={fmtNum(ytd.current_ytd)}
             subtitle={ytd.delta_pct !== null
               ? `${fmtPct(ytd.delta_pct)} vs ${fmtNum(ytd.prior_ytd)} prior` : "no prior year data"}
