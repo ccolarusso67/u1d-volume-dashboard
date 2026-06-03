@@ -8,11 +8,11 @@ import {
   getMonthlyCategoryTrend,
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
-import { getVolumeGoal } from "@/lib/queries/volume-goal";
 import { getReconciliation } from "@/lib/queries/production";
 import { getDailyTargetGallons } from "@/lib/settings/app-settings";
 import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
 import { MixDonut } from "@/components/charts/MixDonut";
+import { RangeSelector, rangeMonths, rangeLabel, normalizeRange } from "@/components/range-selector";
 
 const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import { StackedTrendChart, StackedTrendRow, CATEGORY_COLORS } from "@/components/charts/StackedTrendChart";
@@ -34,7 +34,11 @@ function ytdLabel(month: number): string {
   return "YTD FY";
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage(props: {
+  searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
+}) {
+  const range = normalizeRange((await props.searchParams).range);
+  const months = rangeMonths(range);
   const latest = await getLatestMonth();
   if (!latest) {
     return (
@@ -67,8 +71,6 @@ export default async function DashboardPage() {
       getMonthlyCategoryTrend(6),
     ]);
 
-  const volumeGoal = await getVolumeGoal(latest.period_year, latest.period_month);
-
   const [reconRows, dailyTarget] = await Promise.all([
     getReconciliation(),
     getDailyTargetGallons(),
@@ -82,6 +84,18 @@ export default async function DashboardPage() {
       billed: Math.round(r.billed_gallons ?? 0),
       goal: r.working_days != null ? r.working_days * dailyTarget : null,
     }));
+
+  // Trailing-window totals for the selected range (from already-loaded data).
+  const billedDesc = reconRows
+    .filter((r) => r.billed_gallons != null)
+    .sort((a, b) => (b.period_year * 12 + b.period_month) - (a.period_year * 12 + a.period_month));
+  const win = billedDesc.slice(0, months);
+  const windowVol = win.reduce((s, r) => s + (r.billed_gallons ?? 0), 0);
+  const windowWd = win.reduce((s, r) => s + (r.working_days ?? 0), 0);
+  const windowGoal = windowWd * dailyTarget;
+  const windowDelta = windowVol - windowGoal;
+  const windowMet = windowVol >= windowGoal;
+  const windowSuffix = months === 1 ? "" : ` · ${rangeLabel(range)}`;
 
   const momPct = prevMonthData
     ? (latest.total_gallons - prevMonthData.total_gallons) / prevMonthData.total_gallons
@@ -145,20 +159,26 @@ export default async function DashboardPage() {
       <Nav current="/" />
 
       <div className="container mx-auto px-8 py-8 max-w-7xl">
+        {/* Time range selector */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-gray-400 font-semibold">Time range</div>
+          <RangeSelector current={range} basePath="/" />
+        </div>
+
         {/* KPI tiles */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          <KPITile label="Month Volume" value={fmtNum(latest.total_gallons)}
-            subtitle="gallons billed" accent="navy" />
-          {volumeGoal.goal_gallons != null && (
+          <KPITile
+            label={months === 1 ? "Month volume" : `Volume${windowSuffix}`}
+            value={fmtNum(windowVol)}
+            subtitle={months === 1 ? "gallons billed" : `${win.length} months billed`}
+            accent="navy"
+          />
+          {windowWd > 0 && (
             <KPITile
-              label="Volume Goal"
-              value={fmtNum(volumeGoal.goal_gallons)}
-              subtitle={
-                volumeGoal.delta_gallons != null
-                  ? `${volumeGoal.delta_gallons >= 0 ? "+" : "−"}${fmtNum(Math.abs(volumeGoal.delta_gallons))} gal · ${volumeGoal.met ? "surpassed" : "below"} (${volumeGoal.working_days}d × ${fmtNum(volumeGoal.daily_target)})`
-                  : `${volumeGoal.working_days ?? "—"} days × ${fmtNum(volumeGoal.daily_target)}/day`
-              }
-              accent={volumeGoal.met ? "success" : "red"}
+              label={`Volume goal${windowSuffix}`}
+              value={fmtNum(windowGoal)}
+              subtitle={`${windowDelta >= 0 ? "+" : "−"}${fmtNum(Math.abs(windowDelta))} gal · ${windowMet ? "surpassed" : "below"} (${windowWd}d × ${fmtNum(dailyTarget)})`}
+              accent={windowMet ? "success" : "red"}
             />
           )}
           <KPITile label="MoM Change" value={fmtPct(momPct)}
