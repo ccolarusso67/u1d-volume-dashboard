@@ -9,9 +9,11 @@
  * components / server actions that need the current session.
  */
 import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import type { JWT } from "next-auth/jwt";
 import { authConfig } from "./auth.config";
 import { isEmailAllowed, type AllowlistRole } from "./lib/auth/allowlist";
+import { verifyUserPassword } from "./lib/auth/password";
 
 type EnrichedJWT = JWT & {
   email?: string;
@@ -21,6 +23,28 @@ type EnrichedJWT = JWT & {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  // Providers: Google (edge-safe, from authConfig) + Credentials (Node-only).
+  // Credentials lives here, NOT in auth.config.ts, because its authorize()
+  // uses pg + node:crypto which the Edge middleware runtime cannot load.
+  providers: [
+    ...authConfig.providers,
+    Credentials({
+      name: "Email and password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = typeof credentials?.email === "string" ? credentials.email : "";
+        const password = typeof credentials?.password === "string" ? credentials.password : "";
+        if (!email || !password) return null;
+        const user = await verifyUserPassword(email, password);
+        if (!user) return null;
+        // Returned object seeds the JWT; role is enriched in the jwt callback.
+        return { id: user.email, email: user.email, name: user.name ?? user.email };
+      },
+    }),
+  ],
   callbacks: {
     ...authConfig.callbacks,
 
