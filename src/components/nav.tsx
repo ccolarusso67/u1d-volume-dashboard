@@ -9,6 +9,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/",                label: "Overview",       matchPrefixes: ["/"] },
+  { href: "/customers",       label: "Customers",      matchPrefixes: ["/customers"] },
   { href: "/production",      label: "Production",     matchPrefixes: ["/production"] },
   { href: "/reconciliation",  label: "Reconciliation", matchPrefixes: ["/reconciliation"] },
   { href: "/board",           label: "Board",          matchPrefixes: ["/board"] },
