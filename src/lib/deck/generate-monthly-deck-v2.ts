@@ -55,7 +55,6 @@ import {
 
 const SLIDE_W = 13.33;
 const MARGIN_X = 0.5;
-const TOTAL_SLIDES = 10;
 
 // ---------- public ----------
 
