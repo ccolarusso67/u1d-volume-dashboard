@@ -29,6 +29,7 @@ import { getPool } from "@/lib/db-pool";
 import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
 import { getReconciliation } from "@/lib/queries/production";
 import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
+import { RangeSelector, rangeMonths, rangeLabel, normalizeRange } from "@/components/range-selector";
 
 const MON_SHORT_BOARD = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import type { MonthlyPnl } from "@/lib/finance/types";
@@ -130,7 +131,13 @@ function DeltaText({ value }: { value: number | null }) {
   );
 }
 
-export default async function BoardDashboardPage({ params }: { params: Promise<Params> }) {
+export default async function BoardDashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
+}) {
   const session = await auth();
   const localPreview = isLocalBoardPreview();
   if (!session?.user?.email && !localPreview) redirect(`/login?callbackUrl=/board`);
@@ -223,6 +230,21 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   const reconRows = await getReconciliation();
   const wdByPeriod = new Map(reconRows.map((r) => [`${r.period_year}-${r.period_month}`, r.working_days]));
   const dailyTarget = view.volumeGoal?.daily_target ?? 7000;
+
+  // Trailing-window totals ending at this board period (Month/3M/4M/6M/YoY).
+  const boardRange = normalizeRange((await searchParams).range);
+  const boardMonths = rangeMonths(boardRange);
+  const boardOrd = year * 12 + month;
+  const winRows = reconRows
+    .filter((r) => r.billed_gallons != null && r.period_year * 12 + r.period_month <= boardOrd)
+    .sort((a, b) => (b.period_year * 12 + b.period_month) - (a.period_year * 12 + a.period_month))
+    .slice(0, boardMonths);
+  const winVol = winRows.reduce((s, r) => s + (r.billed_gallons ?? 0), 0);
+  const winWd = winRows.reduce((s, r) => s + (r.working_days ?? 0), 0);
+  const winGoal = winWd * dailyTarget;
+  const winDelta = winVol - winGoal;
+  const winMet = winVol >= winGoal;
+  const winSuffix = boardMonths === 1 ? "" : ` · ${rangeLabel(boardRange)}`;
   const boardVolGoalSeries = view.trend12.map((t) => {
     const wd = wdByPeriod.get(`${t.period_year}-${t.period_month}`);
     return {
@@ -298,6 +320,11 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
         </section>
       )}
 
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400 font-semibold">Goal window</span>
+        <RangeSelector current={boardRange} basePath={`/board/${year}/${month}`} />
+      </div>
+
       {/* 1. Executive snapshot — 8 KPI cards */}
       <SectionCard
         title="Executive Summary"
@@ -331,24 +358,20 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
               : "no prior YTD"}
             tone={view.ytd.delta_pct === null ? "navy" : view.ytd.delta_pct >= 0 ? "ok" : "warn"}
           />
-          {view.volumeGoal?.goal_gallons != null && (
+          {winWd > 0 && (
             <KpiCard
-              label="Volume goal"
-              value={fmtNum(view.volumeGoal.goal_gallons)}
-              sub={`${view.volumeGoal.working_days} days × ${fmtNum(view.volumeGoal.daily_target)} gal/day`}
+              label={`Volume goal${winSuffix}`}
+              value={fmtNum(winGoal)}
+              sub={`${winWd} days × ${fmtNum(dailyTarget)} gal/day`}
               tone="navy"
             />
           )}
-          {view.volumeGoal?.delta_gallons != null && (
+          {winWd > 0 && (
             <KpiCard
-              label="Goal delta"
-              value={formatSigned(view.volumeGoal.delta_gallons)}
-              sub={
-                view.volumeGoal.met
-                  ? `goal surpassed${view.volumeGoal.delta_pct !== null ? ` · ${fmtPct(view.volumeGoal.delta_pct)}` : ""}`
-                  : `below goal${view.volumeGoal.delta_pct !== null ? ` · ${fmtPct(view.volumeGoal.delta_pct)}` : ""}`
-              }
-              tone={view.volumeGoal.met ? "ok" : "warn"}
+              label={`Goal delta${winSuffix}`}
+              value={formatSigned(winDelta)}
+              sub={`${winMet ? "goal surpassed" : "below goal"}${winGoal > 0 ? ` · ${fmtPct(winDelta / winGoal)}` : ""}`}
+              tone={winMet ? "ok" : "warn"}
             />
           )}
           <KpiCard label="Customers" value={fmtNum(h.customer_count)} sub="active this period" tone="neutral" />
