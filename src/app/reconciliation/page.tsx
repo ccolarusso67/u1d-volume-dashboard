@@ -3,10 +3,15 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { KPITile } from "@/components/kpi-tile";
 import { getReconciliation } from "@/lib/queries/production";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
+import { getLocale } from "@/lib/i18n/locale";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReconciliationPage() {
+  const locale = await getLocale();
+  const d = getDict(locale);
+  const t = d.reconciliation;
   const rows = await getReconciliation();
 
   // Aggregate only over months that have BOTH produced AND billed
@@ -35,9 +40,9 @@ export default async function ReconciliationPage() {
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Reconciliation"
-        subtitle="Production vs billing per period — surfaces inventory build/burn"
+        eyebrow={d.common.company}
+        title={t.title}
+        subtitle={t.subtitle}
       />
       <Nav current="/reconciliation" />
 
@@ -45,34 +50,30 @@ export default async function ReconciliationPage() {
         {/* KPI tiles — all navy, +/- carries direction */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <KPITile
-            label="Total Produced"
-            value={fmtNum(totalProduced)}
-            subtitle={`across ${matched.length} matched months`}
+            label={t.kpiProduced}
+            value={fmtNum(totalProduced, 0, locale)}
+            subtitle={t.kpiProducedSub(matched.length)}
             accent="navy"
           />
           <KPITile
-            label="Total Billed"
-            value={fmtNum(totalBilled)}
-            subtitle={`same ${matched.length} months`}
+            label={t.kpiBilled}
+            value={fmtNum(totalBilled, 0, locale)}
+            subtitle={t.kpiBilledSub(matched.length)}
             accent="navy"
           />
           <KPITile
-            label="Inventory Δ"
-            value={(totalDelta >= 0 ? "+" : "") + fmtNum(totalDelta)}
-            subtitle={
-              totalDelta < 0
-                ? "net inventory drawn down"
-                : "net inventory built up"
-            }
+            label={t.kpiInvDelta}
+            value={(totalDelta >= 0 ? "+" : "") + fmtNum(totalDelta, 0, locale)}
+            subtitle={totalDelta < 0 ? t.invDeltaDrawn : t.invDeltaBuilt}
             accent="navy"
           />
           <KPITile
-            label="Δ vs Billed"
+            label={t.kpiDeltaVsBilled}
             value={
               (totalDeltaPct !== null && totalDeltaPct >= 0 ? "+" : "") +
-              fmtPct(totalDeltaPct, 1, false)
+              fmtPct(totalDeltaPct, 1, false, locale)
             }
-            subtitle="aggregate (produced − billed) ÷ billed"
+            subtitle={t.deltaVsBilledSub}
             accent="navy"
           />
         </div>
@@ -80,24 +81,28 @@ export default async function ReconciliationPage() {
         {/* Extremes callout — neutral framing */}
         <section className="bg-amber-50 border border-amber-200 rounded-sm p-5 mb-6">
           <div className="font-heading text-base font-bold text-navy mb-3">
-            Inventory dynamics — extremes
+            {t.extremesTitle}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="font-semibold text-navy">Largest drawdown:</span>{" "}
-              {formatPeriod(biggestBurn.period_year, biggestBurn.period_month)} —
-              produced {fmtNum(biggestBurn.produced_gallons ?? 0)} vs billed{" "}
-              {fmtNum(biggestBurn.billed_gallons ?? 0)} (
-              {fmtNum(biggestBurn.inventory_delta_gallons ?? 0)} gal,{" "}
-              {fmtPct(biggestBurn.inventory_delta_pct, 1, false)})
+              <span className="font-semibold text-navy">{t.largestDrawdown}</span>{" "}
+              {formatPeriod(biggestBurn.period_year, biggestBurn.period_month, locale)} —{" "}
+              {t.extremeDetail(
+                fmtNum(biggestBurn.produced_gallons ?? 0, 0, locale),
+                fmtNum(biggestBurn.billed_gallons ?? 0, 0, locale),
+                fmtNum(biggestBurn.inventory_delta_gallons ?? 0, 0, locale),
+                fmtPct(biggestBurn.inventory_delta_pct, 1, false, locale)
+              )}
             </div>
             <div>
-              <span className="font-semibold text-navy">Largest buildup:</span>{" "}
-              {formatPeriod(biggestBuild.period_year, biggestBuild.period_month)} —
-              produced {fmtNum(biggestBuild.produced_gallons ?? 0)} vs billed{" "}
-              {fmtNum(biggestBuild.billed_gallons ?? 0)} (+
-              {fmtNum(biggestBuild.inventory_delta_gallons ?? 0)} gal, +
-              {fmtPct(biggestBuild.inventory_delta_pct, 1, false)})
+              <span className="font-semibold text-navy">{t.largestBuildup}</span>{" "}
+              {formatPeriod(biggestBuild.period_year, biggestBuild.period_month, locale)} —{" "}
+              {t.extremeDetail(
+                fmtNum(biggestBuild.produced_gallons ?? 0, 0, locale),
+                fmtNum(biggestBuild.billed_gallons ?? 0, 0, locale),
+                "+" + fmtNum(biggestBuild.inventory_delta_gallons ?? 0, 0, locale),
+                "+" + fmtPct(biggestBuild.inventory_delta_pct, 1, false, locale)
+              )}
             </div>
           </div>
         </section>
@@ -105,21 +110,20 @@ export default async function ReconciliationPage() {
         {/* Full table — neutral colors, +/- sign carries direction */}
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
-            Production vs Billing — All Periods
+            {t.tableTitle}
           </h2>
           <div className="text-xs text-gray-500 mb-4">
-            Negative Δ = inventory burn (sold more than produced).
-            Positive Δ = inventory build (produced more than sold).
+            {t.tableNote}
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-2 font-medium">Period</th>
-                <th className="text-right pb-2 font-medium">Produced</th>
-                <th className="text-right pb-2 font-medium">Billed</th>
-                <th className="text-right pb-2 font-medium">Δ Inventory</th>
-                <th className="text-right pb-2 font-medium">Δ %</th>
-                <th className="text-right pb-2 font-medium">Working Days</th>
+                <th className="text-left pb-2 font-medium">{t.thPeriod}</th>
+                <th className="text-right pb-2 font-medium">{t.thProduced}</th>
+                <th className="text-right pb-2 font-medium">{t.thBilled}</th>
+                <th className="text-right pb-2 font-medium">{t.thDeltaInv}</th>
+                <th className="text-right pb-2 font-medium">{d.common.deltaPct}</th>
+                <th className="text-right pb-2 font-medium">{t.thWorkingDays}</th>
               </tr>
             </thead>
             <tbody>
@@ -129,24 +133,24 @@ export default async function ReconciliationPage() {
                   className="border-b border-gray-100 last:border-b-0"
                 >
                   <td className="py-2 text-navy">
-                    {formatPeriod(r.period_year, r.period_month)}
+                    {formatPeriod(r.period_year, r.period_month, locale)}
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.produced_gallons !== null ? fmtNum(r.produced_gallons) : "—"}
+                    {r.produced_gallons !== null ? fmtNum(r.produced_gallons, 0, locale) : "—"}
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.billed_gallons !== null ? fmtNum(r.billed_gallons) : "—"}
+                    {r.billed_gallons !== null ? fmtNum(r.billed_gallons, 0, locale) : "—"}
                   </td>
                   <td className="py-2 text-right font-medium text-navy tabular-nums">
                     {r.inventory_delta_gallons !== null
                       ? (r.inventory_delta_gallons >= 0 ? "+" : "") +
-                        fmtNum(r.inventory_delta_gallons)
+                        fmtNum(r.inventory_delta_gallons, 0, locale)
                       : "—"}
                   </td>
                   <td className="py-2 text-right text-navy tabular-nums">
                     {r.inventory_delta_pct !== null
                       ? (r.inventory_delta_pct >= 0 ? "+" : "") +
-                        fmtPct(r.inventory_delta_pct, 1, false)
+                        fmtPct(r.inventory_delta_pct, 1, false, locale)
                       : "—"}
                   </td>
                   <td className="py-2 text-right text-gray-500">
@@ -159,9 +163,7 @@ export default async function ReconciliationPage() {
         </section>
 
         <footer className="mt-12 text-xs text-gray-500 italic">
-          Reconciliation from <code>u1d_ops.mv_volume_reconciliation</code> ·
-          Inventory anchor pending — once set, this page will also show running
-          stock on hand and months of cover.
+          {t.footer}
         </footer>
       </div>
     </main>
