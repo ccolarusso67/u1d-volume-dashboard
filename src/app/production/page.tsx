@@ -5,9 +5,16 @@ import {
   getLatestProductionMonth,
   getAllLinesForMonth,
 } from "@/lib/queries/production";
+import { getLineMargin } from "@/lib/finance/line-margin";
+import { RangeSelector, rangeMonths, rangeLabel, normalizeRange } from "@/components/range-selector";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
+
+function money(n: number): string {
+  const sign = n < 0 ? "-" : "";
+  return `${sign}$${fmtNum(Math.abs(n))}`;
+}
 
 function barColor(utilPct: number): string {
   if (utilPct >= 90) return "bg-[#E1261C]";
@@ -24,7 +31,13 @@ function utilLabel(utilPct: number): string {
   return "IDLE";
 }
 
-export default async function ProductionPage() {
+export default async function ProductionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
+}) {
+  const marginRange = normalizeRange((await searchParams).range ?? "3m");
+  const marginMonths = rangeMonths(marginRange);
   const latest = await getLatestProductionMonth();
 
   if (!latest) {
@@ -40,6 +53,7 @@ export default async function ProductionPage() {
   }
 
   const rows = await getAllLinesForMonth(latest.period_year, latest.period_month);
+  const margin = await getLineMargin(marginMonths);
 
   const totalMaxPerDay    = rows.reduce((a, r) => a + r.max_gallons_per_day, 0);
   const totalTargetPerDay = rows.reduce((a, r) => a + r.target_gallons_per_day, 0);
@@ -157,9 +171,100 @@ export default async function ProductionPage() {
           </table>
         </section>
 
+        <section className="bg-white border border-gray-200 rounded-sm p-6 mt-8">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
+            <h2 className="font-heading text-xl font-bold text-navy">
+              Contribution Margin by Filling Line
+            </h2>
+            <RangeSelector current={marginRange} basePath="/production" />
+          </div>
+          <div className="text-xs text-gray-500 mb-4">
+            {marginRange === "month" ? "Latest invoice month" : `Trailing ${rangeLabel(marginRange)}`}
+            {margin.windowEnd ? ` ending ${margin.windowEnd.slice(0, 7)}` : ""} ·
+            Revenue − product COGS from QuickBooks (u1dynamics), attributed to each
+            line. Excludes filling labor &amp; line overhead (Version B).
+          </div>
+
+          {!margin.configured ? (
+            <div className="text-sm text-gray-500 italic py-6">
+              Finance warehouse not connected (<code>U1D_FINANCE_DATABASE_URL</code> unset).
+              Margin by line will populate once the finance read replica is wired.
+            </div>
+          ) : !margin.hasData ? (
+            <div className="text-sm text-gray-500 italic py-6">
+              No U1Dynamics invoice data in this window yet. As QuickBooks sync
+              populates the u1dynamics entity, contribution margin per line will appear here.
+            </div>
+          ) : (
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                    <th className="text-left pb-2 font-medium">Line</th>
+                    <th className="text-right pb-2 font-medium">Revenue</th>
+                    <th className="text-right pb-2 font-medium">Product COGS</th>
+                    <th className="text-right pb-2 font-medium">Contribution</th>
+                    <th className="text-right pb-2 font-medium">Margin %</th>
+                    <th className="text-right pb-2 font-medium">Gallons</th>
+                    <th className="text-right pb-2 font-medium">$/gal</th>
+                    <th className="text-right pb-2 font-medium">Contrib/gal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {margin.lines.map((r) => (
+                    <tr key={r.parent_line} className="border-b border-gray-100 last:border-b-0">
+                      <td className="py-3 font-medium text-navy">{r.label}</td>
+                      <td className="py-3 text-right tabular-nums">{money(r.revenue)}</td>
+                      <td className="py-3 text-right tabular-nums text-gray-500">{money(r.cogs)}</td>
+                      <td className={`py-3 text-right tabular-nums font-medium ${r.contribution < 0 ? "text-[#E1261C]" : "text-navy"}`}>
+                        {money(r.contribution)}
+                      </td>
+                      <td className={`py-3 text-right tabular-nums ${r.marginPct !== null && r.marginPct < 0 ? "text-[#E1261C]" : ""}`}>
+                        {r.marginPct === null ? "—" : fmtPct(r.marginPct, 1, false)}
+                      </td>
+                      <td className="py-3 text-right tabular-nums text-gray-500">{r.gallons > 0 ? fmtNum(r.gallons) : "—"}</td>
+                      <td className="py-3 text-right tabular-nums">{r.revPerGal === null ? "—" : money(r.revPerGal)}</td>
+                      <td className={`py-3 text-right tabular-nums ${r.contribPerGal !== null && r.contribPerGal < 0 ? "text-[#E1261C]" : ""}`}>
+                        {r.contribPerGal === null ? "—" : money(r.contribPerGal)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-navy font-bold">
+                    <td className="py-3 text-navy">TOTAL (mapped)</td>
+                    <td className="py-3 text-right text-navy tabular-nums">{money(margin.lines.reduce((s, r) => s + r.revenue, 0))}</td>
+                    <td className="py-3 text-right text-navy tabular-nums">{money(margin.totalCogs)}</td>
+                    <td className={`py-3 text-right tabular-nums ${margin.totalContribution < 0 ? "text-[#E1261C]" : "text-navy"}`}>{money(margin.totalContribution)}</td>
+                    <td className="py-3 text-right text-navy tabular-nums">
+                      {(() => {
+                        const rev = margin.lines.reduce((s, r) => s + r.revenue, 0);
+                        return rev > 0 ? fmtPct(margin.totalContribution / rev, 1, false) : "—";
+                      })()}
+                    </td>
+                    <td className="py-3 text-right text-navy tabular-nums">{margin.totalGallons > 0 ? fmtNum(margin.totalGallons) : "—"}</td>
+                    <td className="py-3" colSpan={2}></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="mt-4 text-xs text-gray-500">
+                Mapped {fmtPct(margin.mappedPctOfRevenue, 0, false)} of window revenue to a line.
+                {margin.unmappedRevenue > 0 && (
+                  <> Unmapped: {money(margin.unmappedRevenue)}
+                    {margin.unmappedTop.length > 0 && (
+                      <> — top: {margin.unmappedTop.slice(0, 4).map((u) => u.product_name).join(", ")}.
+                        Extend <code>LINE_RULES</code> in <code>line-margin.ts</code> to capture these.</>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+
         <footer className="mt-12 text-xs text-gray-500 italic">
           Capacity sourced from <code>u1d_ops.production_lines</code> ·
-          Actuals rolled up from <code>u1d_ops.production_daily</code>.
+          Actuals rolled up from <code>u1d_ops.production_daily</code> ·
+          Margin from <code>u1p_finance.invoice_lines</code> (read-only, u1dynamics).
         </footer>
       </div>
     </main>
