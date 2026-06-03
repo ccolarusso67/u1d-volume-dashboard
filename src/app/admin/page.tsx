@@ -105,6 +105,17 @@ export default async function AdminHome() {
                 </div>
               </a>
             )}
+            {isAdmin && (
+              <a
+                href="/admin/reconciliation"
+                className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
+              >
+                <div className="text-sm font-medium">Revenue reconciliation →</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  Gross invoice revenue vs P&amp;L income; explain the gap.
+                </div>
+              </a>
+            )}
           </div>
           <p className="text-xs text-gray-500 mb-6 italic">
             Access is gated by Google OAuth and the{" "}
