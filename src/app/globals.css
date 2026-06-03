@@ -3,9 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --navy: #003c71;
-  --navy-deep: #002647;
+  --navy: #0b1f3a;
+  --navy-deep: #071326;
   --brand-red: #e1261c;
+  --brand-orange: #ed8b00;
+  --brand-green: #067a46;
+  --paper: #f6f8fb;
+  --line: #e6e9ee;
+}
+
+body {
+  background: var(--paper);
 }
 
 html,

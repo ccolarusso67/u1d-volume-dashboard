@@ -9,6 +9,11 @@ import {
 } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
 import { getVolumeGoal } from "@/lib/queries/volume-goal";
+import { getReconciliation } from "@/lib/queries/production";
+import { getDailyTargetGallons } from "@/lib/settings/app-settings";
+import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
+
+const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import { StackedTrendChart, StackedTrendRow } from "@/components/charts/StackedTrendChart";
 import { CATEGORY_DISPLAY_ORDER } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
@@ -62,6 +67,20 @@ export default async function DashboardPage() {
     ]);
 
   const volumeGoal = await getVolumeGoal(latest.period_year, latest.period_month);
+
+  const [reconRows, dailyTarget] = await Promise.all([
+    getReconciliation(),
+    getDailyTargetGallons(),
+  ]);
+  const volGoalSeries = reconRows
+    .filter((r) => r.billed_gallons != null)
+    .sort((a, b) => a.period_year - b.period_year || a.period_month - b.period_month)
+    .slice(-12)
+    .map((r) => ({
+      month: MON_SHORT[r.period_month - 1],
+      billed: Math.round(r.billed_gallons ?? 0),
+      goal: r.working_days != null ? r.working_days * dailyTarget : null,
+    }));
 
   const momPct = prevMonthData
     ? (latest.total_gallons - prevMonthData.total_gallons) / prevMonthData.total_gallons
@@ -141,6 +160,30 @@ export default async function DashboardPage() {
               ? `${fmtPct(ytd.delta_pct)} vs ${fmtNum(ytd.prior_ytd)} prior` : "no prior year data"}
             accent={ytd.delta_pct !== null && ytd.delta_pct >= 0 ? "success" : "red"} />
         </div>
+
+        {/* Volume vs goal — signature chart */}
+        {volGoalSeries.length > 0 && (
+          <section className="bg-white border border-line rounded-xl p-6 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-heading text-xl font-bold text-navy">Volume vs goal</h2>
+                <div className="text-[10px] uppercase tracking-[0.12em] text-gray-400 font-semibold mt-1">
+                  Last 12 months · billed gallons
+                </div>
+              </div>
+              <div className="flex gap-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm bg-navy" />Billed volume
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: "#ED8B00" }} />
+                  Monthly goal (working days × {fmtNum(dailyTarget)})
+                </span>
+              </div>
+            </div>
+            <VolumeGoalChart data={volGoalSeries} />
+          </section>
+        )}
 
         {/* 6-Month Stacked Trend Chart */}
         <section className="bg-white border border-gray-200 rounded-sm p-6 mb-6">
