@@ -29,6 +29,19 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   risks: "Risks",
 };
 
+export const SECTION_LABELS_ES: Record<SectionKey, string> = {
+  capacity_production: "Capacidad y Producción",
+  supply_chain: "Cadena de Suministro",
+  quality_incidents: "Calidad e Incidentes",
+  initiatives: "Iniciativas",
+  risks: "Riesgos",
+};
+
+/** Locale-aware section labels. Defaults to English. */
+export function getSectionLabels(locale: "en" | "es" = "en"): Record<SectionKey, string> {
+  return locale === "es" ? SECTION_LABELS_ES : SECTION_LABELS;
+}
+
 /** Mapping between API/UI section keys and the actual DB column names. */
 export const SECTION_DB_COLUMN: Record<SectionKey, string> = {
   capacity_production: "capacity_md",
