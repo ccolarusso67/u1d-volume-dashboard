@@ -13,7 +13,7 @@ import { categorizeFamily } from "@/lib/queries/category";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
 import { MixDonut } from "@/components/charts/MixDonut";
 import { CATEGORY_COLORS } from "@/components/charts/StackedTrendChart";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";

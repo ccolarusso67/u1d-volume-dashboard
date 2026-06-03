@@ -10,7 +10,7 @@ import { Nav } from "@/components/nav";
 import { HeroHeader } from "@/components/layout/hero-header";
 import { getLatestMonth, getCustomerYoYForMonth } from "@/lib/queries/monthly";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";

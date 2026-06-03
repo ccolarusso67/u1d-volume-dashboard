@@ -13,27 +13,28 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
-function errorMessage(errorParam?: string | string[]): string | null {
-  if (!errorParam) return null;
-  const code = Array.isArray(errorParam) ? errorParam[0] : errorParam;
-  switch (code) {
-    case "CredentialsSignin":
-      return "Invalid email or password. If you have not set a password yet, contact an administrator.";
-    case "AccessDenied":
-      return "This account is not authorized to access this dashboard. Contact an administrator to be added to the allowlist.";
-    case "Configuration":
-      return "Authentication is not configured correctly. Contact an administrator.";
-    case "Verification":
-      return "The sign-in link is no longer valid.";
-    default:
-      return "Sign-in failed. Please try again.";
-  }
-}
-
 export default async function LoginPage(props: { searchParams: Promise<SearchParams> }) {
+  const locale = await getLocale();
+  const d = getDict(locale);
+  const t = d.login;
+
+  function errorMessage(errorParam?: string | string[]): string | null {
+    if (!errorParam) return null;
+    const code = Array.isArray(errorParam) ? errorParam[0] : errorParam;
+    switch (code) {
+      case "CredentialsSignin": return t.errCredentials;
+      case "AccessDenied": return t.errAccessDenied;
+      case "Configuration": return t.errConfig;
+      case "Verification": return t.errVerification;
+      default: return t.errDefault;
+    }
+  }
+
   const searchParams = await props.searchParams;
   const callbackUrl =
     typeof searchParams.callbackUrl === "string" ? searchParams.callbackUrl : "/admin";
@@ -59,9 +60,9 @@ export default async function LoginPage(props: { searchParams: Promise<SearchPar
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-sm shadow-sm px-8 py-10">
         <div className="text-[11px] tracking-[0.2em] text-gray-500 mb-2">
-          U1DYNAMICS MANUFACTURING LLC
+          {d.common.company}
         </div>
-        <h1 className="font-heading text-2xl font-bold text-navy mb-6">Sign in</h1>
+        <h1 className="font-heading text-2xl font-bold text-navy mb-6">{t.title}</h1>
 
         {message && (
           <div
@@ -73,18 +74,17 @@ export default async function LoginPage(props: { searchParams: Promise<SearchPar
         )}
 
         <p className="text-sm text-gray-600 mb-6">
-          Sign in with your work email and password. Access is limited to the
-          allowlist in <code>u1d_ops.users</code>. The public dashboards at{" "}
-          <a href="/" className="text-navy underline">Overview</a>,{" "}
-          <a href="/production" className="text-navy underline">Production</a>, and{" "}
-          <a href="/reconciliation" className="text-navy underline">Reconciliation</a>{" "}
-          do not require sign-in.
+          {t.intro1} <code>u1d_ops.users</code>. {t.publicAt}{" "}
+          <a href="/" className="text-navy underline">{d.nav.overview}</a>,{" "}
+          <a href="/production" className="text-navy underline">{d.nav.production}</a>, {t.and}{" "}
+          <a href="/reconciliation" className="text-navy underline">{d.nav.reconciliation}</a>{" "}
+          {t.noSignin}
         </p>
 
         <form action={passwordSignIn} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1">
-              Email
+              {t.email}
             </label>
             <input
               id="email"
@@ -98,7 +98,7 @@ export default async function LoginPage(props: { searchParams: Promise<SearchPar
           </div>
           <div>
             <label htmlFor="password" className="block text-xs font-medium text-gray-700 mb-1">
-              Password
+              {t.password}
             </label>
             <input
               id="password"
@@ -114,13 +114,13 @@ export default async function LoginPage(props: { searchParams: Promise<SearchPar
             type="submit"
             className="w-full inline-flex items-center justify-center bg-navy hover:bg-navy-deep text-white font-medium text-sm px-4 py-3 rounded-sm transition-colors"
           >
-            Sign in
+            {t.submit}
           </button>
         </form>
 
         <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-wider text-gray-400">
           <span className="h-px flex-1 bg-gray-200" />
-          or
+          {t.or}
           <span className="h-px flex-1 bg-gray-200" />
         </div>
 
@@ -140,12 +140,12 @@ export default async function LoginPage(props: { searchParams: Promise<SearchPar
               <path d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.35-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.77.42 3.44 1.18 4.93l3.66-2.84z" />
               <path d="M12 5.38c1.62 0 3.06.55 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" />
             </svg>
-            Sign in with Google
+            {t.google}
           </button>
         </form>
 
         <p className="text-xs text-gray-500 italic mt-6">
-          Need access or a password reset? Contact an administrator.
+          {t.footer}
         </p>
       </div>
     </main>

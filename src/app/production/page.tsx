@@ -8,7 +8,7 @@ import {
 import { getLineMargin } from "@/lib/finance/line-margin";
 import { RangeSelector, rangeMonths, rangeLabel, normalizeRange } from "@/components/range-selector";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";

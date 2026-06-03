@@ -15,10 +15,15 @@ import { auth, signOut } from "@/auth";
 import { Nav } from "@/components/nav";
 import { HeroHeader } from "@/components/layout/hero-header";
 import { redirect } from "next/navigation";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
+  const locale = await getLocale();
+  const d = getDict(locale);
+  const t = d.admin;
   const session = await auth();
 
   // Defense in depth: middleware should have redirected unauthenticated
@@ -33,14 +38,14 @@ export default async function AdminHome() {
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Admin"
+        eyebrow={d.common.company}
+        title={t.title}
         subtitle={
           <>
-            Signed in as {email} · role: {role ?? "unknown"}
+            {t.signedInAs(email ?? "", role ?? t.unknownRole)}
             {isAdmin && (
               <span className="ml-2 not-italic text-[11px] bg-white/10 px-2 py-0.5 rounded-sm tracking-wider">
-                ADMIN
+                {t.adminBadge}
               </span>
             )}
           </>
@@ -51,47 +56,46 @@ export default async function AdminHome() {
       <div className="container mx-auto px-8 py-8 max-w-3xl">
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-3">
-            Admin surface
+            {t.surfaceTitle}
           </h2>
           <p className="text-sm text-gray-700 mb-4">
-            Use this area to upload the monthly board report and review the
-            upload history.
+            {t.surfaceBody}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <a
               href="/admin/upload"
               className="block bg-navy hover:bg-navy-deep text-white px-4 py-3 rounded-sm transition-colors"
             >
-              <div className="text-sm font-medium">Upload Monthly Report →</div>
+              <div className="text-sm font-medium">{t.uploadTitle}</div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                Parse, version, persist, and flag alerts.
+                {t.uploadSub}
               </div>
             </a>
             <a
               href="/admin/periods"
               className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
             >
-              <div className="text-sm font-medium">Periods / Monthly Close →</div>
+              <div className="text-sm font-medium">{t.periodsTitle}</div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                Status, alerts, notes, and next action for every period.
+                {t.periodsSub}
               </div>
             </a>
             <a
               href="/board"
               className="block bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-3 rounded-sm transition-colors"
             >
-              <div className="text-sm font-medium">Board Dashboard →</div>
+              <div className="text-sm font-medium">{t.boardTitle}</div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                View locked, board-ready monthly operating dashboards.
+                {t.boardSub}
               </div>
             </a>
             <a
               href="/admin/distribution"
               className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
             >
-              <div className="text-sm font-medium">Board Distribution →</div>
+              <div className="text-sm font-medium">{t.distTitle}</div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                Manage board deck distribution lists and recipients.
+                {t.distSub}
               </div>
             </a>
             {isAdmin && (
@@ -99,9 +103,9 @@ export default async function AdminHome() {
                 href="/admin/users"
                 className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
               >
-                <div className="text-sm font-medium">Users &amp; Access →</div>
+                <div className="text-sm font-medium">{t.usersTitle}</div>
                 <div className="text-[11px] opacity-80 mt-0.5">
-                  Add members, set roles, and manage passwords.
+                  {t.usersSub}
                 </div>
               </a>
             )}
@@ -110,16 +114,15 @@ export default async function AdminHome() {
                 href="/admin/reconciliation"
                 className="block bg-white border border-navy text-navy hover:bg-navy hover:text-white px-4 py-3 rounded-sm transition-colors"
               >
-                <div className="text-sm font-medium">Revenue reconciliation →</div>
+                <div className="text-sm font-medium">{t.reconTitle}</div>
                 <div className="text-[11px] opacity-80 mt-0.5">
-                  Gross invoice revenue vs P&amp;L income; explain the gap.
+                  {t.reconSub}
                 </div>
               </a>
             )}
           </div>
           <p className="text-xs text-gray-500 mb-6 italic">
-            Access is gated by Google OAuth and the{" "}
-            <code>u1d_ops.users</code> allowlist (PR 003A).
+            {t.gatedNote}
           </p>
 
           <form
@@ -132,7 +135,7 @@ export default async function AdminHome() {
               type="submit"
               className="inline-flex items-center justify-center bg-navy hover:bg-navy-deep text-white font-medium text-sm px-4 py-2 rounded-sm transition-colors"
             >
-              Sign out
+              {t.signOut}
             </button>
           </form>
         </section>

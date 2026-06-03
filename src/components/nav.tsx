@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 import { LocaleToggle } from "@/components/locale-toggle";
 

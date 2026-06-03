@@ -3,7 +3,7 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { KPITile } from "@/components/kpi-tile";
 import { getReconciliation } from "@/lib/queries/production";
 import { formatPeriod, fmtNum, fmtPct } from "@/lib/brand";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";

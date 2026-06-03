@@ -17,7 +17,7 @@ import { StackedTrendChart, StackedTrendRow, CATEGORY_COLORS } from "@/component
 import { CATEGORY_DISPLAY_ORDER, categorizeFamily } from "@/lib/queries/category";
 import { YoYDriversChart } from "@/components/charts/YoYDriversChart";
 import { PackageMixChart } from "@/components/charts/PackageMixChart";
-import { getLocale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
