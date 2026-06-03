@@ -40,6 +40,16 @@ import { safeQuery, safeQueryOne } from "./safe-query";
  */
 export const MARGIN_COMPANY_IDS = ["u1p_ultrachem", "u1dynamics"];
 
+/**
+ * Intercompany elimination. Sales between the two in-group entities (chiefly
+ * U1Dynamics → "Ultrachem LLC", which is most of U1Dynamics' book) must be
+ * removed so the same gallons aren't counted twice — once when U1Dynamics
+ * bills Ultrachem and again when Ultrachem bills the market. Matched on the
+ * invoice customer name (case-insensitive POSIX regex). The eliminated total
+ * is surfaced in the report so the adjustment is auditable, not hidden.
+ */
+const INTERCOMPANY_RE = "ULTRACHEM|U1\\s*DYNAMICS|ULTRA\\s*1\\s*PLUS|ULTRA1PLUS";
+
 // ---------------------------------------------------------------------------
 // Classification rules — product string -> production parent line.
 // Tested top-to-bottom; first match wins.
@@ -87,6 +97,7 @@ export function classifyLine(text: string): string | null {
 // ---------------------------------------------------------------------------
 
 type ProductRow = {
+  is_intercompany: boolean;
   product_name: string;
   category: string;
   revenue: number;
@@ -119,12 +130,13 @@ export type LineMarginReport = {
   unmappedRevenue: number;
   unmappedTop: { product_name: string; revenue: number }[];
   mappedPctOfRevenue: number; // share of revenue that landed on a line
+  intercompanyEliminated: number; // revenue removed as intercompany
 };
 
 const EMPTY: LineMarginReport = {
   configured: false, hasData: false, windowEnd: null, months: 3,
   lines: [], totalRevenue: 0, totalCogs: 0, totalContribution: 0, totalGallons: 0,
-  unmappedRevenue: 0, unmappedTop: [], mappedPctOfRevenue: 0,
+  unmappedRevenue: 0, unmappedTop: [], mappedPctOfRevenue: 0, intercompanyEliminated: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -156,6 +168,7 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     financePool,
     `
     SELECT
+      (COALESCE(c.full_name, c.company_name, '') ~* $4) AS is_intercompany,
       COALESCE(NULLIF(TRIM(il.description),''), pc.name, NULLIF(il.sku,''), il.item_id, '(unnamed)') AS product_name,
       COALESCE(pc.category,'') AS category,
       COALESCE(SUM(il.line_total),0)::float8 AS revenue,
@@ -163,14 +176,16 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
       COALESCE(SUM(il.quantity),0)::float8 AS qty
     FROM invoice_lines il
     JOIN invoices i ON i.txn_id = il.invoice_txn_id
+    LEFT JOIN customers c
+      ON c.customer_id = i.customer_id AND c.company_id = il.company_id
     LEFT JOIN product_catalog pc
       ON pc.item_id = il.item_id AND pc.company_id = il.company_id
     WHERE il.company_id = ANY($1)
       AND i.txn_date >= ($2::date - make_interval(months => $3 - 1))
       AND i.txn_date <  ($2::date + INTERVAL '1 month')
-    GROUP BY 1, 2
+    GROUP BY 1, 2, 3
     `,
-    [MARGIN_COMPANY_IDS, end, m]
+    [MARGIN_COMPANY_IDS, end, m, INTERCOMPANY_RE]
   );
 
   // Produced gallons per parent line over the same window (main pool, u1d_ops).
@@ -199,11 +214,16 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     gallonsByParent = new Map();
   }
 
-  // Classify + aggregate.
+  // Classify + aggregate. Intercompany lines are removed up front.
   const agg = new Map<string, { revenue: number; cogs: number }>();
   let unmappedRevenue = 0;
+  let intercompanyEliminated = 0;
   const unmapped: { product_name: string; revenue: number }[] = [];
   for (const p of products) {
+    if (p.is_intercompany) {
+      intercompanyEliminated += p.revenue;
+      continue;
+    }
     const parent = classifyLine(`${p.product_name} ${p.category}`);
     if (!parent) {
       unmappedRevenue += p.revenue;
@@ -256,5 +276,6 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     unmappedRevenue,
     unmappedTop: unmapped.slice(0, 8),
     mappedPctOfRevenue: totalRevenue > 0 ? mappedRevenue / totalRevenue : 0,
+    intercompanyEliminated,
   };
 }
