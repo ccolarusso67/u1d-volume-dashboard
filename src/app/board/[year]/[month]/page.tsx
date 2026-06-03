@@ -27,6 +27,10 @@ import { SectionCard } from "@/components/layout/section-card";
 import { KpiCard } from "@/components/layout/kpi-card";
 import { getPool } from "@/lib/db-pool";
 import { getBoardExecutiveDashboard } from "@/lib/board/get-board-executive-dashboard";
+import { getReconciliation } from "@/lib/queries/production";
+import { VolumeGoalChart } from "@/components/charts/VolumeGoalChart";
+
+const MON_SHORT_BOARD = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 import type { MonthlyPnl } from "@/lib/finance/types";
 import type { BoardFinanceOverlay } from "@/lib/board/executive-types";
 import { generateBoardNarrative, type NarrativeSeverity } from "@/lib/board/narrative";
@@ -214,6 +218,19 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
   // ---------------- READY: render the executive dashboard ----------------
   const h = view.currentMetrics;
   const noFacts = h.fact_row_count === 0;
+
+  // 12-month billed volume vs monthly goal (working days × daily target).
+  const reconRows = await getReconciliation();
+  const wdByPeriod = new Map(reconRows.map((r) => [`${r.period_year}-${r.period_month}`, r.working_days]));
+  const dailyTarget = view.volumeGoal?.daily_target ?? 7000;
+  const boardVolGoalSeries = view.trend12.map((t) => {
+    const wd = wdByPeriod.get(`${t.period_year}-${t.period_month}`);
+    return {
+      month: MON_SHORT_BOARD[t.period_month - 1],
+      billed: Math.round(t.total_gallons),
+      goal: wd != null ? wd * dailyTarget : null,
+    };
+  });
   const activeList = distributionLists.find((l) => l.is_active);
   const statusLabel = view.period.status
     ? view.period.status.charAt(0).toUpperCase() + view.period.status.slice(1)
@@ -385,13 +402,19 @@ export default async function BoardDashboardPage({ params }: { params: Promise<P
 
       {/* 2. Revenue / volume */}
       <SectionCard
-        title="Revenue / Volume"
-        subtitle="Current board data is volume-based. Each bar is total gallons for a locked period; outline-only bars indicate periods not yet locked."
+        title="Volume vs goal"
+        subtitle="Billed gallons per locked period against the monthly goal (working days × daily target)."
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TrendBars title="6-month trend" rows={view.trend6} />
-          <TrendBars title="12-month trend" rows={view.trend12} />
+        <div className="flex flex-wrap justify-end gap-4 text-xs text-gray-500 mb-2">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-navy" />Billed volume
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: "#ED8B00" }} />
+            Monthly goal (working days × {fmtNum(dailyTarget)})
+          </span>
         </div>
+        <VolumeGoalChart data={boardVolGoalSeries} />
         <DecisionCard card={decisionVolume} />
       </SectionCard>
 
