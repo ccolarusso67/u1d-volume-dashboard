@@ -29,6 +29,7 @@
 import { getFinancePool } from "./db-pool";
 import { getPool } from "../db-pool";
 import { safeQuery, safeQueryOne } from "./safe-query";
+import { getLineConversionRates } from "../settings/app-settings";
 
 /**
  * Entities included in the filling-line margin view. Production happens under
@@ -115,6 +116,12 @@ export type LineMarginRow = {
   gallons: number;
   revPerGal: number | null;
   contribPerGal: number | null;
+  // Version B — fully-loaded margin. null when no conversion rate is set for the line.
+  conversionRate: number | null; // $/gallon
+  conversionCost: number | null; // rate × produced gallons
+  netContribution: number | null; // contribution − conversion cost
+  netMarginPct: number | null; // net contribution ÷ revenue
+  netPerGal: number | null; // net contribution ÷ produced gallons
 };
 
 export type LineMarginReport = {
@@ -131,12 +138,17 @@ export type LineMarginReport = {
   unmappedTop: { product_name: string; revenue: number }[];
   mappedPctOfRevenue: number; // share of revenue that landed on a line
   intercompanyEliminated: number; // revenue removed as intercompany
+  // Version B totals
+  anyConversionSet: boolean; // any line has a conversion rate configured
+  totalConversionCost: number; // sum of set conversion costs
+  totalNetContribution: number; // totalContribution − totalConversionCost
 };
 
 const EMPTY: LineMarginReport = {
   configured: false, hasData: false, windowEnd: null, months: 3,
   lines: [], totalRevenue: 0, totalCogs: 0, totalContribution: 0, totalGallons: 0,
   unmappedRevenue: 0, unmappedTop: [], mappedPctOfRevenue: 0, intercompanyEliminated: 0,
+  anyConversionSet: false, totalConversionCost: 0, totalNetContribution: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -236,11 +248,17 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     agg.set(parent, cur);
   }
 
+  // Per-line conversion rates ($/gal) for fully-loaded (Version B) margin.
+  const conversionRates = await getLineConversionRates();
+
   const lines: LineMarginRow[] = PARENT_ORDER
     .map((parent) => {
       const a = agg.get(parent) ?? { revenue: 0, cogs: 0 };
       const gallons = gallonsByParent.get(parent) ?? 0;
       const contribution = a.revenue - a.cogs;
+      const rate = conversionRates[parent] ?? null;
+      const conversionCost = rate !== null ? rate * gallons : null;
+      const netContribution = conversionCost !== null ? contribution - conversionCost : null;
       return {
         parent_line: parent,
         label: PARENT_LABEL[parent],
@@ -251,6 +269,11 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
         gallons,
         revPerGal: gallons > 0 ? a.revenue / gallons : null,
         contribPerGal: gallons > 0 ? contribution / gallons : null,
+        conversionRate: rate,
+        conversionCost,
+        netContribution,
+        netMarginPct: netContribution !== null && a.revenue > 0 ? netContribution / a.revenue : null,
+        netPerGal: netContribution !== null && gallons > 0 ? netContribution / gallons : null,
       };
     })
     .filter((r) => r.revenue !== 0 || r.gallons !== 0);
@@ -260,6 +283,8 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
   const totalContribution = lines.reduce((s, r) => s + r.contribution, 0);
   const totalGallons = lines.reduce((s, r) => s + r.gallons, 0);
   const mappedRevenue = lines.reduce((s, r) => s + r.revenue, 0);
+  const totalConversionCost = lines.reduce((s, r) => s + (r.conversionCost ?? 0), 0);
+  const anyConversionSet = lines.some((r) => r.conversionRate !== null);
 
   unmapped.sort((a, b) => b.revenue - a.revenue);
 
@@ -277,5 +302,8 @@ export async function getLineMargin(months: number): Promise<LineMarginReport> {
     unmappedTop: unmapped.slice(0, 8),
     mappedPctOfRevenue: totalRevenue > 0 ? mappedRevenue / totalRevenue : 0,
     intercompanyEliminated,
+    anyConversionSet,
+    totalConversionCost,
+    totalNetContribution: totalContribution - totalConversionCost,
   };
 }

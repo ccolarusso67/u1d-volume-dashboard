@@ -203,6 +203,14 @@ export default async function ProductionPage({
             </div>
           ) : (
             <>
+              {!margin.anyConversionSet && (
+                <div className="mb-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-sm px-3 py-2">
+                  {t.convNotSetPre}{" "}
+                  <a href="/admin/users" className="underline font-medium">{t.convNotSetLink}</a>{" "}
+                  {t.convNotSetPost}
+                </div>
+              )}
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
@@ -214,6 +222,8 @@ export default async function ProductionPage({
                     <th className="text-right pb-2 font-medium">{t.thGallons}</th>
                     <th className="text-right pb-2 font-medium">{t.thRevPerGal}</th>
                     <th className="text-right pb-2 font-medium">{t.thContribPerGal}</th>
+                    {margin.anyConversionSet && <th className="text-right pb-2 font-medium">{t.thConvCost}</th>}
+                    {margin.anyConversionSet && <th className="text-right pb-2 font-medium">{t.thNetContribution}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -233,6 +243,28 @@ export default async function ProductionPage({
                       <td className={`py-3 text-right tabular-nums ${r.contribPerGal !== null && r.contribPerGal < 0 ? "text-[#E1261C]" : ""}`}>
                         {r.contribPerGal === null ? "—" : money(r.contribPerGal, locale)}
                       </td>
+                      {margin.anyConversionSet && (
+                        <td className="py-3 text-right tabular-nums text-gray-500">
+                          {r.conversionCost === null ? "—" : (
+                            <>
+                              {money(r.conversionCost, locale)}
+                              <div className="text-[10px] text-gray-400">{t.atRatePerGal(money(r.conversionRate ?? 0, locale))}</div>
+                            </>
+                          )}
+                        </td>
+                      )}
+                      {margin.anyConversionSet && (
+                        <td className={`py-3 text-right tabular-nums font-medium ${r.netContribution !== null && r.netContribution < 0 ? "text-[#E1261C]" : "text-navy"}`}>
+                          {r.netContribution === null ? "—" : (
+                            <>
+                              {money(r.netContribution, locale)}
+                              <div className={`text-[10px] ${r.netMarginPct !== null && r.netMarginPct < 0 ? "text-[#E1261C]" : "text-gray-400"}`}>
+                                {r.netMarginPct === null ? "" : fmtPct(r.netMarginPct, 1, false, locale)}
+                              </div>
+                            </>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                   <tr className="border-t-2 border-navy font-bold">
@@ -248,9 +280,12 @@ export default async function ProductionPage({
                     </td>
                     <td className="py-3 text-right text-navy tabular-nums">{margin.totalGallons > 0 ? fmtNum(margin.totalGallons, 0, locale) : "—"}</td>
                     <td className="py-3" colSpan={2}></td>
+                    {margin.anyConversionSet && <td className="py-3 text-right text-navy tabular-nums">{money(margin.totalConversionCost, locale)}</td>}
+                    {margin.anyConversionSet && <td className={`py-3 text-right tabular-nums ${margin.totalNetContribution < 0 ? "text-[#E1261C]" : "text-navy"}`}>{money(margin.totalNetContribution, locale)}</td>}
                   </tr>
                 </tbody>
               </table>
+              </div>
 
               <div className="mt-4 text-xs text-gray-500">
                 {t.mappedCoverage(fmtPct(margin.mappedPctOfRevenue, 0, false, locale))}
@@ -260,6 +295,7 @@ export default async function ProductionPage({
                       t.unmappedTop(margin.unmappedTop.slice(0, 4).map((u) => u.product_name).join(", "))}
                   </>
                 )}
+                {margin.anyConversionSet && <div className="mt-1">{t.fullyLoadedNote}</div>}
               </div>
             </>
           )}

@@ -10,13 +10,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { requireAdminSession } from "@/lib/auth/require-admin";
-import { getDailyTargetGallons, setDailyTargetGallons } from "@/lib/settings/app-settings";
+import {
+  getDailyTargetGallons, setDailyTargetGallons,
+  getLineConversionRates, setLineConversionRates,
+} from "@/lib/settings/app-settings";
 
 export async function GET() {
   const a = await requireAdminSession(() => auth());
   if (!a.ok) return NextResponse.json(a.body, { status: a.status });
-  const dailyTarget = await getDailyTargetGallons();
-  return NextResponse.json({ ok: true, dailyTarget }, { status: 200 });
+  const [dailyTarget, lineConversionRates] = await Promise.all([
+    getDailyTargetGallons(),
+    getLineConversionRates(),
+  ]);
+  return NextResponse.json({ ok: true, dailyTarget, lineConversionRates }, { status: 200 });
 }
 
 export async function POST(req: NextRequest) {
@@ -30,12 +36,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "invalid_json" }, { status: 400 });
   }
 
-  const n = Number(body.dailyTarget);
-  if (!Number.isFinite(n) || n <= 0) {
-    return NextResponse.json({ ok: false, message: "invalid_target" }, { status: 400 });
+  const email = a.session.user?.email ?? undefined;
+  const hasTarget = "dailyTarget" in body;
+  const hasRates = "lineConversionRates" in body;
+
+  if (!hasTarget && !hasRates) {
+    return NextResponse.json({ ok: false, message: "nothing_to_update" }, { status: 400 });
   }
+
   try {
-    await setDailyTargetGallons(n, a.session.user?.email ?? undefined);
+    if (hasTarget) {
+      const n = Number(body.dailyTarget);
+      if (!Number.isFinite(n) || n <= 0) {
+        return NextResponse.json({ ok: false, message: "invalid_target" }, { status: 400 });
+      }
+      await setDailyTargetGallons(n, email);
+    }
+    if (hasRates) {
+      const rates = body.lineConversionRates;
+      if (typeof rates !== "object" || rates === null) {
+        return NextResponse.json({ ok: false, message: "invalid_rates" }, { status: 400 });
+      }
+      await setLineConversionRates(rates as Record<string, number | string | null>, email);
+    }
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     console.error("[admin/settings:POST]", err);

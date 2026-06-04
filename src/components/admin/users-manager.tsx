@@ -23,15 +23,19 @@ type ManagedUser = {
   created_at: string;
 };
 
+const CONVERSION_LINES = ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "Line 6"];
+
 export function UsersManager({
   initialUsers,
   currentEmail,
   initialDailyTarget,
+  initialConversionRates = {},
   locale = "en",
 }: {
   initialUsers: ManagedUser[];
   currentEmail: string;
   initialDailyTarget: number;
+  initialConversionRates?: Record<string, number>;
   locale?: Locale;
 }) {
   const t = getDict(locale).adminUsers;
@@ -48,6 +52,40 @@ export function UsersManager({
   const [pw, setPw] = useState<Record<string, string>>({});
   // volume-goal daily target
   const [dailyTarget, setDailyTarget] = useState(String(initialDailyTarget));
+  // per-line conversion rates ($/gal)
+  const [convRates, setConvRates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      CONVERSION_LINES.map((k) => [k, initialConversionRates[k] != null ? String(initialConversionRates[k]) : ""])
+    )
+  );
+
+  async function saveConversionRates() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const payload: Record<string, number> = {};
+      for (const k of CONVERSION_LINES) {
+        const v = Number(convRates[k]);
+        if (Number.isFinite(v) && v > 0) payload[k] = v;
+      }
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineConversionRates: payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setNotice({ kind: "err", text: t.convCouldNotSave });
+      } else {
+        setNotice({ kind: "ok", text: t.convSaved });
+        router.refresh();
+      }
+    } catch {
+      setNotice({ kind: "err", text: ERR.internal_error });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveDailyTarget() {
     setBusy(true);
@@ -141,6 +179,41 @@ export function UsersManager({
         <p className="text-xs text-gray-500 mt-3">
           {t.volumeGoalNote}
         </p>
+      </section>
+
+      {/* Per-line conversion cost */}
+      <section className="bg-white border border-gray-200 rounded-sm p-5">
+        <h2 className="font-heading text-lg font-bold text-navy mb-1">{t.convTitle}</h2>
+        <p className="text-xs text-gray-500 mb-4">{t.convNote}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {CONVERSION_LINES.map((k) => (
+            <div key={k}>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                {t.convLineLabels[k] ?? k}
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-500">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={convRates[k] ?? ""}
+                  onChange={(e) => setConvRates((s) => ({ ...s, [k]: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-28 border border-gray-300 rounded-sm px-2 py-1.5 text-sm"
+                />
+                <span className="text-xs text-gray-400">/gal</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          disabled={busy}
+          onClick={saveConversionRates}
+          className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm px-4 py-2 rounded-sm"
+        >
+          {t.convSave}
+        </button>
       </section>
 
       {/* Add user */}

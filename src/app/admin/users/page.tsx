@@ -10,7 +10,7 @@ import { auth } from "@/auth";
 import { Nav } from "@/components/nav";
 import { HeroHeader } from "@/components/layout/hero-header";
 import { listUsers } from "@/lib/users/manage-users";
-import { getDailyTargetGallons } from "@/lib/settings/app-settings";
+import { getDailyTargetGallons, getLineConversionRates } from "@/lib/settings/app-settings";
 import { UsersManager } from "@/components/admin/users-manager";
 import { getLocale } from "@/lib/i18n/server";
 import { getDict } from "@/lib/i18n/dictionaries";
@@ -31,6 +31,7 @@ export default async function AdminUsersPage() {
 
   const users = await listUsers();
   const dailyTarget = await getDailyTargetGallons();
+  const conversionRates = await getLineConversionRates();
 
   return (
     <main>
@@ -45,6 +46,7 @@ export default async function AdminUsersPage() {
           initialUsers={users}
           currentEmail={session.user.email}
           initialDailyTarget={dailyTarget}
+          initialConversionRates={conversionRates}
           locale={locale}
         />
         <p className="text-xs text-gray-500 italic mt-6">
