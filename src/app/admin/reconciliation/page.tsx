@@ -10,13 +10,20 @@ import { auth } from "@/auth";
 import { Nav } from "@/components/nav";
 import { HeroHeader } from "@/components/layout/hero-header";
 import { getRevenueReconciliation } from "@/lib/finance/reconcile-revenue";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 export const dynamic = "force-dynamic";
 
-const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+const lc = (locale: Locale) => (locale === "es" ? "es-ES" : "en-US");
+const money = (n: number, locale: Locale) => "$" + Math.round(n).toLocaleString(lc(locale));
 const moneyM = (n: number) => "$" + (n / 1_000_000).toFixed(2) + "M";
 
 export default async function ReconciliationAdminPage() {
+  const locale = await getLocale();
+  const dict = getDict(locale);
+  const t = dict.adminRecon;
   const session = await auth();
   if (!session?.user?.email) redirect("/login?callbackUrl=/admin/reconciliation");
   if (session.user.isAdmin !== true) redirect("/admin");
@@ -29,51 +36,47 @@ export default async function ReconciliationAdminPage() {
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Revenue reconciliation"
-        subtitle={
-          r.configured
-            ? <>Gross invoice revenue vs P&amp;L income · trailing 12 months ending {r.windowEnd}</>
-            : <>Finance warehouse not connected (U1D_FINANCE_DATABASE_URL unset).</>
-        }
+        eyebrow={dict.common.company}
+        title={t.title}
+        subtitle={r.configured ? t.subtitleOk(r.windowEnd ?? "—") : t.subtitleOff}
       />
       <Nav current="/admin" />
 
       <div className="container mx-auto px-8 py-8 max-w-6xl">
         {!r.configured ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-5 py-4 text-sm">
-            The finance database isn&apos;t configured for this deployment, so the reconciliation can&apos;t run here.
+            {t.notConfigured}
           </div>
         ) : (
           <>
             {/* Headline comparison */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <Card label="P&L income (TTM)" value={moneyM(r.pnlIncomeTtm)} sub="QuickBooks P&L · u1dynamics · accrual" tone="navy" />
-              <Card label="Invoice gross — U1Dynamics" value={moneyM(r.u1dInvoiceGross)} sub={ratio ? `${ratio.toFixed(2)}× the P&L` : "—"} tone={ratio && ratio > 1.3 ? "red" : "navy"} />
-              <Card label="Invoice gross — Ultrachem + U1D" value={moneyM(r.allCompaniesInvoiceGross)} sub={allRatio ? `${allRatio.toFixed(2)}× the P&L` : "—"} tone={allRatio && allRatio > 1.7 ? "red" : "navy"} />
-              <Card label="QB sales-by-customer (TTM)" value={moneyM(r.salesByCustomerTtm)} sub="u1dynamics rollup" tone="navy" />
+              <Card label={t.cardPnl} value={moneyM(r.pnlIncomeTtm)} sub={t.cardPnlSub} tone="navy" />
+              <Card label={t.cardU1d} value={moneyM(r.u1dInvoiceGross)} sub={ratio ? t.timesPnl(ratio.toFixed(2)) : "—"} tone={ratio && ratio > 1.3 ? "red" : "navy"} />
+              <Card label={t.cardUltraU1d} value={moneyM(r.allCompaniesInvoiceGross)} sub={allRatio ? t.timesPnl(allRatio.toFixed(2)) : "—"} tone={allRatio && allRatio > 1.7 ? "red" : "navy"} />
+              <Card label={t.cardSbc} value={moneyM(r.salesByCustomerTtm)} sub={t.cardSbcSub} tone="navy" />
             </div>
 
             {/* Auto diagnosis */}
             <div className="bg-white border border-line rounded-xl p-6 mb-6">
-              <h2 className="font-heading text-lg font-bold text-navy mb-2">Reading</h2>
+              <h2 className="font-heading text-lg font-bold text-navy mb-2">{t.reading}</h2>
               <p className="text-sm text-gray-700 leading-relaxed">
-                {diagnose(r)}
+                {diagnose(r, t)}
               </p>
             </div>
 
             {/* Invoice gross by company */}
-            <Panel title="Gross invoice revenue by company (TTM)" note="Scoped to Ultrachem + U1Dynamics. The ~$19.7M/$24M figure was these two summed, not U1Dynamics alone.">
+            <Panel title={t.byCompanyTitle} note={t.byCompanyNote}>
               <table className="w-full text-sm">
                 <thead><tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
-                  <th className="text-left pb-2">Company</th><th className="text-right pb-2">Gross invoice revenue</th><th className="text-right pb-2">Invoices</th>
+                  <th className="text-left pb-2">{t.thCompany}</th><th className="text-right pb-2">{t.thGrossRev}</th><th className="text-right pb-2">{t.thInvoices}</th>
                 </tr></thead>
                 <tbody>
                   {r.invoiceGrossByCompany.map((c) => (
                     <tr key={c.company_id ?? "null"} className="border-b border-gray-100 last:border-0">
                       <td className="py-2 text-navy">{c.company_id ?? "(null)"}</td>
-                      <td className="py-2 text-right tabular-nums">{money(c.revenue)}</td>
-                      <td className="py-2 text-right tabular-nums text-gray-500">{c.invoices.toLocaleString()}</td>
+                      <td className="py-2 text-right tabular-nums">{money(c.revenue, locale)}</td>
+                      <td className="py-2 text-right tabular-nums text-gray-500">{c.invoices.toLocaleString(lc(locale))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -81,32 +84,32 @@ export default async function ReconciliationAdminPage() {
             </Panel>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Panel title="U1Dynamics invoice revenue by customer (TTM)" note="Intercompany accounts (U1Dynamics Mfg, Maxilub, etc.) are eliminated in the P&L but appear here.">
+              <Panel title={t.byCustomerTitle} note={t.byCustomerNote}>
                 <table className="w-full text-sm">
                   <thead><tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
-                    <th className="text-left pb-2">Customer</th><th className="text-right pb-2">Invoice revenue</th>
+                    <th className="text-left pb-2">{t.thCustomer}</th><th className="text-right pb-2">{t.thInvoiceRevenue}</th>
                   </tr></thead>
                   <tbody>
                     {r.byCustomer.map((x, i) => (
                       <tr key={i} className="border-b border-gray-100 last:border-0">
                         <td className="py-2 text-navy">{x.name}</td>
-                        <td className="py-2 text-right tabular-nums">{money(x.amount)}</td>
+                        <td className="py-2 text-right tabular-nums">{money(x.amount, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </Panel>
 
-              <Panel title="U1Dynamics invoice lines by class (TTM)" note="Freight, tax, discounts, and deposits inflate gross vs P&L income.">
+              <Panel title={t.byClassTitle} note={t.byClassNote}>
                 <table className="w-full text-sm">
                   <thead><tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-line">
-                    <th className="text-left pb-2">Class</th><th className="text-right pb-2">Line total</th>
+                    <th className="text-left pb-2">{t.thClass}</th><th className="text-right pb-2">{t.thLineTotal}</th>
                   </tr></thead>
                   <tbody>
                     {r.byClass.map((x, i) => (
                       <tr key={i} className="border-b border-gray-100 last:border-0">
                         <td className="py-2 text-navy">{x.name}</td>
-                        <td className="py-2 text-right tabular-nums">{money(x.amount)}</td>
+                        <td className="py-2 text-right tabular-nums">{money(x.amount, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -120,14 +123,17 @@ export default async function ReconciliationAdminPage() {
   );
 }
 
-function diagnose(r: Awaited<ReturnType<typeof getRevenueReconciliation>>): string {
-  if (r.pnlIncomeTtm <= 0) return "No P&L income found for the window — confirm the finance sync has run for U1Dynamics.";
+function diagnose(
+  r: Awaited<ReturnType<typeof getRevenueReconciliation>>,
+  t: ReturnType<typeof getDict>["adminRecon"]
+): string {
+  if (r.pnlIncomeTtm <= 0) return t.diagNoPnl;
   const u = r.u1dInvoiceGross / r.pnlIncomeTtm;
   const a = r.allCompaniesInvoiceGross / r.pnlIncomeTtm;
   if (u <= 1.15) {
-    return `U1Dynamics gross invoice revenue (${moneyM(r.u1dInvoiceGross)}) is close to P&L income (${moneyM(r.pnlIncomeTtm)}). The ~$19.7M figure was Ultrachem and U1Dynamics combined (${moneyM(r.allCompaniesInvoiceGross)}, ${a.toFixed(1)}× the P&L), a missing company filter, not a real discrepancy. Per-customer dollars are board-grade once scoped to U1Dynamics.`;
+    return t.diagReconciled(moneyM(r.u1dInvoiceGross), moneyM(r.pnlIncomeTtm), moneyM(r.allCompaniesInvoiceGross), a.toFixed(1));
   }
-  return `U1Dynamics gross invoice revenue (${moneyM(r.u1dInvoiceGross)}) is ${u.toFixed(2)}× the P&L income (${moneyM(r.pnlIncomeTtm)}) — so the gap is within U1Dynamics. Check the by-customer table for intercompany accounts and the by-class table for freight/tax/discount lines; those two should account for most of the difference between gross invoices and net P&L income.`;
+  return t.diagWithinU1d(moneyM(r.u1dInvoiceGross), u.toFixed(2), moneyM(r.pnlIncomeTtm));
 }
 
 function Card({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: "navy" | "red" }) {

@@ -16,10 +16,15 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { PeriodsTable } from "@/components/admin/periods-table";
 import { listPeriods } from "@/lib/periods/list-periods";
 import { getPool } from "@/lib/db-pool";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
 export default async function PeriodsIndexPage() {
+  const locale = await getLocale();
+  const dict = getDict(locale);
+  const t = dict.periods;
   const session = await auth();
   if (!session?.user?.email) {
     redirect("/login?callbackUrl=/admin/periods");
@@ -33,19 +38,19 @@ export default async function PeriodsIndexPage() {
   try {
     rows = await listPeriods(getPool(), { limit: 60 });
   } catch (err) {
-    error = err instanceof Error ? err.message : "Unknown error";
+    error = err instanceof Error ? err.message : t.unknownError;
   }
 
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Periods / Monthly Close"
+        eyebrow={dict.common.company}
+        title={t.pageTitle}
         subtitle={
           <>
-            Every tracked period and where it stands in the monthly close workflow. Signed in as {session.user.email}.
+            {t.pageSubtitle(session.user.email)}
             <span className="mx-2">·</span>
-            <a href="/admin" className="underline opacity-90 hover:opacity-100">Back to admin home</a>
+            <a href="/admin" className="underline opacity-90 hover:opacity-100">{t.backToAdmin}</a>
           </>
         }
       />
@@ -55,10 +60,10 @@ export default async function PeriodsIndexPage() {
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="font-heading text-xl font-bold text-navy">
-              All periods
+              {t.allPeriods}
             </h2>
             <span className="text-xs text-gray-500 italic">
-              Showing latest 60 · sorted newest first
+              {t.showingLatest}
             </span>
           </div>
           {error ? (
@@ -66,11 +71,11 @@ export default async function PeriodsIndexPage() {
               role="alert"
               className="bg-red-50 border border-red-200 text-red-900 rounded-sm px-4 py-3 text-sm"
             >
-              <div className="font-semibold">Could not load periods</div>
+              <div className="font-semibold">{t.couldNotLoad}</div>
               <div className="text-xs mt-1 font-mono">{error}</div>
             </div>
           ) : (
-            <PeriodsTable rows={rows} />
+            <PeriodsTable rows={rows} locale={locale} />
           )}
         </section>
 
@@ -85,7 +90,7 @@ export default async function PeriodsIndexPage() {
               type="submit"
               className="text-xs text-gray-600 hover:text-navy underline"
             >
-              Sign out
+              {dict.admin.signOut}
             </button>
           </form>
         </section>

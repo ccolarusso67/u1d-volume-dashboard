@@ -10,18 +10,22 @@
  */
 import type { PeriodIndexRow, NextActionTone } from "@/lib/periods/list-periods";
 import { formatBlockerLabels } from "@/lib/review/blocker-labels";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
-function formatLocaleDateTime(iso: string | null): string {
+type PeriodsDict = ReturnType<typeof getDict>["periods"];
+
+function formatLocaleDateTime(iso: string | null, locale: Locale): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.valueOf())) return iso;
-  return d.toLocaleString("en-US", {
+  return d.toLocaleString(locale === "es" ? "es-ES" : "en-US", {
     year: "numeric", month: "short", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
 }
 
-function StatusBadge({ status }: { status: string | null }) {
+function StatusBadge({ status, statusLabels }: { status: string | null; statusLabels: Record<string, string> }) {
   if (!status) {
     return <span className="text-[10px] uppercase tracking-wider text-gray-400">—</span>;
   }
@@ -37,47 +41,49 @@ function StatusBadge({ status }: { status: string | null }) {
     <span
       className={`inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm ${palette[status] ?? "bg-gray-100 text-gray-700"}`}
     >
-      {status.replace(/_/g, " ")}
+      {statusLabels[status] ?? status.replace(/_/g, " ")}
     </span>
   );
 }
 
-function NotesBadge({ exists, complete }: { exists: boolean; complete: boolean }) {
+function NotesBadge({ exists, complete, t }: { exists: boolean; complete: boolean; t: PeriodsDict }) {
   if (complete) {
-    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">complete</span>;
+    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">{t.notesComplete}</span>;
   }
   if (exists) {
-    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-amber-50 text-amber-900 px-2 py-0.5 rounded-sm">draft</span>;
+    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-amber-50 text-amber-900 px-2 py-0.5 rounded-sm">{t.notesDraft}</span>;
   }
-  return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">missing</span>;
+  return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{t.notesMissing}</span>;
 }
 
 function ReadinessBadge({
-  ready, status, blockers,
+  ready, status, blockers, t, locale,
 }: {
   ready: boolean;
   status: string | null;
   blockers: string[];
+  t: PeriodsDict;
+  locale: Locale;
 }) {
   if (status === "locked") {
-    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">locked</span>;
+    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">{t.readyLocked}</span>;
   }
   if (ready) {
-    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">ready</span>;
+    return <span className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded-sm">{t.ready}</span>;
   }
   return (
     <span
       className="inline-block text-[10px] uppercase tracking-wider font-semibold bg-amber-50 text-amber-900 px-2 py-0.5 rounded-sm"
-      title={formatBlockerLabels(blockers).join("\n")}
+      title={formatBlockerLabels(blockers, locale).join("\n")}
     >
-      blocked
+      {t.blocked}
     </span>
   );
 }
 
 function ActionButton({
-  label, href, tone,
-}: { label: string; href: string; tone: NextActionTone }) {
+  label, href, tone, t,
+}: { label: string; href: string; tone: NextActionTone; t: PeriodsDict }) {
   const palette: Record<NextActionTone, string> = {
     primary: "bg-navy hover:bg-navy-deep text-white",
     warning: "bg-amber-700 hover:bg-amber-800 text-white",
@@ -89,14 +95,14 @@ function ActionButton({
       href={href}
       className={`inline-block text-xs font-medium px-3 py-1 rounded-sm transition-colors whitespace-nowrap ${palette[tone]}`}
     >
-      {label}
+      {t.actions[label] ?? label}
     </a>
   );
 }
 
 function AlertChips({
-  pkg, cust, dq,
-}: { pkg: number; cust: number; dq: number }) {
+  pkg, cust, dq, t,
+}: { pkg: number; cust: number; dq: number; t: PeriodsDict }) {
   const total = pkg + cust + dq;
   if (total === 0) {
     return <span className="text-[11px] text-gray-400 italic">—</span>;
@@ -105,46 +111,48 @@ function AlertChips({
     <span className="text-xs whitespace-nowrap">
       {pkg > 0 && (
         <span className="bg-amber-50 border border-amber-200 text-amber-900 px-1.5 py-0.5 rounded-sm mr-1">
-          {pkg} pkg
+          {pkg} {t.alertPkg}
         </span>
       )}
       {cust > 0 && (
         <span className="bg-amber-50 border border-amber-200 text-amber-900 px-1.5 py-0.5 rounded-sm mr-1">
-          {cust} cust
+          {cust} {t.alertCust}
         </span>
       )}
       {dq > 0 && (
         <span className="bg-amber-50 border border-amber-200 text-amber-900 px-1.5 py-0.5 rounded-sm">
-          {dq} dq
+          {dq} {t.alertDq}
         </span>
       )}
     </span>
   );
 }
 
-export function PeriodsTable({ rows }: { rows: PeriodIndexRow[] }) {
+export function PeriodsTable({ rows, locale = "en" }: { rows: PeriodIndexRow[]; locale?: Locale }) {
+  const t = getDict(locale).periods;
   if (rows.length === 0) {
     return (
       <div className="text-sm italic text-gray-500 px-4 py-8 text-center bg-gray-50 border border-gray-200 rounded-sm">
-        No periods to show yet. Upload a monthly workbook from{" "}
-        <a href="/admin/upload" className="text-navy underline">/admin/upload</a> to seed the index.
+        {t.emptyPre}{" "}
+        <a href="/admin/upload" className="text-navy underline">/admin/upload</a> {t.emptyPost}
       </div>
     );
   }
 
+  const statusLabels = getDict(locale).board.status;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-            <th className="text-left pb-2 pr-3 font-medium">Period</th>
-            <th className="text-left pb-2 pr-3 font-medium">Status</th>
-            <th className="text-left pb-2 pr-3 font-medium">Active file</th>
-            <th className="text-left pb-2 pr-3 font-medium">Uploaded</th>
-            <th className="text-left pb-2 pr-3 font-medium">Alerts</th>
-            <th className="text-left pb-2 pr-3 font-medium">Notes</th>
-            <th className="text-left pb-2 pr-3 font-medium">Lock</th>
-            <th className="text-right pb-2 pr-3 font-medium">Next action</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thPeriod}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thStatus}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thActiveFile}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thUploaded}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thAlerts}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thNotes}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thLock}</th>
+            <th className="text-right pb-2 pr-3 font-medium">{t.thNextAction}</th>
           </tr>
         </thead>
         <tbody>
@@ -162,7 +170,7 @@ export function PeriodsTable({ rows }: { rows: PeriodIndexRow[] }) {
                 </a>
               </td>
               <td className="py-2.5 pr-3 whitespace-nowrap">
-                <StatusBadge status={row.status} />
+                <StatusBadge status={row.status} statusLabels={statusLabels} />
               </td>
               <td className="py-2.5 pr-3">
                 {row.activeFile ? (
@@ -181,13 +189,13 @@ export function PeriodsTable({ rows }: { rows: PeriodIndexRow[] }) {
                     </span>
                   </div>
                 ) : (
-                  <span className="text-[11px] italic text-gray-400">none</span>
+                  <span className="text-[11px] italic text-gray-400">{t.none}</span>
                 )}
               </td>
               <td className="py-2.5 pr-3 text-xs text-gray-700 whitespace-nowrap">
                 {row.activeFile ? (
                   <div>
-                    <div>{formatLocaleDateTime(row.activeFile.uploaded_at)}</div>
+                    <div>{formatLocaleDateTime(row.activeFile.uploaded_at, locale)}</div>
                     <div className="text-[11px] text-gray-500">
                       {row.activeFile.uploaded_by ?? "—"}
                     </div>
@@ -201,12 +209,14 @@ export function PeriodsTable({ rows }: { rows: PeriodIndexRow[] }) {
                   pkg={row.alertCounts.pending_package}
                   cust={row.alertCounts.pending_customer}
                   dq={row.alertCounts.pending_data_quality}
+                  t={t}
                 />
               </td>
               <td className="py-2.5 pr-3 whitespace-nowrap">
                 <NotesBadge
                   exists={row.operatorNotes.exists}
                   complete={row.operatorNotes.complete}
+                  t={t}
                 />
               </td>
               <td className="py-2.5 pr-3 whitespace-nowrap">
@@ -214,19 +224,19 @@ export function PeriodsTable({ rows }: { rows: PeriodIndexRow[] }) {
                   ready={row.readiness.ready}
                   status={row.status}
                   blockers={row.readiness.blockers}
+                  t={t}
+                  locale={locale}
                 />
               </td>
               <td className="py-2.5 pr-3 text-right">
-                <ActionButton {...row.nextAction} />
+                <ActionButton {...row.nextAction} t={t} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className="mt-3 text-[11px] text-gray-500 italic">
-        Source: <code>u1d_ops.board_periods</code> joined to active{" "}
-        <code>volume_files</code> and <code>monthly_operator_notes</code>.
-        Hover the "blocked" badge for the full readiness reason list.
+        {t.footer}
       </p>
     </div>
   );

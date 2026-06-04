@@ -16,7 +16,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatorNotes, SectionKey } from "@/lib/operator-notes/types";
-import { SECTION_KEYS, SECTION_LABELS } from "@/lib/operator-notes/types";
+import { SECTION_KEYS, getSectionLabels } from "@/lib/operator-notes/types";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type Feedback =
   | { kind: "idle" }
@@ -28,11 +30,15 @@ export function OperatorNotesForm({
   year,
   month,
   initialNotes,
+  locale = "en",
 }: {
   year: number;
   month: number;
   initialNotes: OperatorNotes;
+  locale?: Locale;
 }) {
+  const t = getDict(locale).operatorNotes;
+  const sectionLabels = getSectionLabels(locale);
   const router = useRouter();
   const [values, setValues] = useState<Record<SectionKey, string>>(() =>
     Object.fromEntries(
@@ -66,17 +72,17 @@ export function OperatorNotesForm({
       if (!res.ok || !j.ok) {
         const msg =
           j.reason === "sections_incomplete"
-            ? "Cannot mark complete: all five sections must have content."
+            ? t.cannotComplete
             : j.reason ?? `HTTP ${res.status}`;
         setFeedback({ kind: "error", message: msg });
         return;
       }
       const successMsg =
         mode === "mark_complete"
-          ? "Notes marked complete. The period can be locked once alerts are resolved."
+          ? t.markedComplete
           : mode === "reopen"
-          ? "Notes reopened. Edit and mark complete again to re-lock the period."
-          : "Draft saved.";
+          ? t.reopened
+          : t.draftSaved;
       setFeedback({ kind: "ok", message: successMsg });
       // Reflect server-truth sections back into the form (server may have
       // normalized whitespace).
@@ -91,7 +97,7 @@ export function OperatorNotesForm({
     } catch (err) {
       setFeedback({
         kind: "error",
-        message: err instanceof Error ? err.message : "Network error",
+        message: err instanceof Error ? err.message : t.networkError,
       });
     }
   }
@@ -112,7 +118,7 @@ export function OperatorNotesForm({
             htmlFor={`section-${k}`}
             className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1"
           >
-            {SECTION_LABELS[k]}
+            {sectionLabels[k]}
           </label>
           <textarea
             id={`section-${k}`}
@@ -123,12 +129,12 @@ export function OperatorNotesForm({
             }
             rows={6}
             className="block w-full text-sm font-mono border border-gray-300 rounded-sm px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/30 disabled:opacity-60"
-            placeholder={`Markdown for ${SECTION_LABELS[k]}…`}
+            placeholder={t.placeholder(sectionLabels[k])}
           />
           <div className="text-[11px] text-gray-400 mt-1 tabular-nums">
-            {(values[k] ?? "").trim().length} chars
+            {(values[k] ?? "").trim().length} {t.chars}
             {((values[k] ?? "").trim().length === 0) && (
-              <span className="text-amber-700 ml-2">required for completion</span>
+              <span className="text-amber-700 ml-2">{t.requiredForCompletion}</span>
             )}
           </div>
         </div>
@@ -140,7 +146,7 @@ export function OperatorNotesForm({
           disabled={saving}
           className="bg-gray-100 hover:bg-gray-200 text-navy text-sm font-medium px-4 py-2 rounded-sm disabled:opacity-50"
         >
-          Save draft
+          {t.saveDraft}
         </button>
         <button
           type="button"
@@ -148,7 +154,7 @@ export function OperatorNotesForm({
           onClick={() => submit("mark_complete")}
           className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-sm disabled:opacity-50"
         >
-          Mark complete
+          {t.markComplete}
         </button>
         {isLocked && (
           <button
@@ -157,11 +163,11 @@ export function OperatorNotesForm({
             onClick={() => submit("reopen")}
             className="bg-white text-amber-900 border border-amber-300 hover:bg-amber-50 text-sm font-medium px-4 py-2 rounded-sm disabled:opacity-50"
           >
-            Reopen for editing
+            {t.reopenForEditing}
           </button>
         )}
         {feedback.kind === "saving" && (
-          <span className="text-xs text-gray-500 italic">Saving…</span>
+          <span className="text-xs text-gray-500 italic">{t.saving}</span>
         )}
       </div>
 
