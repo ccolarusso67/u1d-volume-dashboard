@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { formatBlockerLabels } from "@/lib/review/blocker-labels";
 import { useRouter } from "next/navigation";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type State =
   | { phase: "idle" }
@@ -14,12 +16,15 @@ export function LockPeriodButton({
   month,
   canLock,
   blockedReasons,
+  locale = "en",
 }: {
   year: number;
   month: number;
   canLock: boolean;
   blockedReasons: string[];
+  locale?: Locale;
 }) {
+  const t = getDict(locale).reviewPanels;
   const router = useRouter();
   const [state, setState] = useState<State>({ phase: "idle" });
   const [, startTransition] = useTransition();
@@ -45,7 +50,7 @@ export function LockPeriodButton({
     } catch (err) {
       setState({
         phase: "error",
-        message: err instanceof Error ? err.message : "Network error",
+        message: err instanceof Error ? err.message : t.networkError,
       });
     }
   }
@@ -53,7 +58,7 @@ export function LockPeriodButton({
   const busy = state.phase === "submitting";
 
   if (!canLock) {
-    const friendly = formatBlockerLabels(blockedReasons);
+    const friendly = formatBlockerLabels(blockedReasons, locale);
     return (
       <div>
         <button
@@ -63,14 +68,14 @@ export function LockPeriodButton({
           className="bg-gray-200 text-gray-500 px-4 py-2 rounded-sm text-sm font-medium cursor-not-allowed"
           title={friendly.join("\n")}
         >
-          Lock period
+          {t.lockPeriod}
         </button>
         <div className="mt-2 text-xs text-gray-500 italic max-w-md">
           {friendly.length === 1 ? (
-            <>This period cannot be locked yet: {friendly[0]}</>
+            <>{t.cannotLockYet} {friendly[0]}</>
           ) : (
             <>
-              This period cannot be locked yet:
+              {t.cannotLockYet}
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 {friendly.map((f, i) => (
                   <li key={i}>{f}</li>
@@ -92,14 +97,14 @@ export function LockPeriodButton({
         aria-busy={busy}
         className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-sm text-sm font-medium disabled:opacity-50"
       >
-        {busy ? "Locking…" : "Lock period"}
+        {busy ? t.locking : t.lockPeriod}
       </button>
       {state.phase === "error" && (
         <div
           role="alert"
           className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-sm"
         >
-          Could not lock: {state.message}
+          {t.couldNotLock(state.message)}
         </div>
       )}
     </div>

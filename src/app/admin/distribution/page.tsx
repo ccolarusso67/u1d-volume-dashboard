@@ -13,10 +13,15 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { getPool } from "@/lib/db-pool";
 import { listDistributionLists } from "@/lib/distribution/list-distribution-lists";
 import { getDistributionList } from "@/lib/distribution/get-distribution-list";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDistributionPage() {
+  const locale = await getLocale();
+  const dict = getDict(locale);
+  const t = dict.distribution;
   const session = await auth();
   if (!session?.user?.email) redirect("/login?callbackUrl=/admin/distribution");
   if (session.user.isAdmin !== true) redirect("/?error=forbidden");
@@ -29,13 +34,13 @@ export default async function AdminDistributionPage() {
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Board Distribution"
+        eyebrow={dict.common.company}
+        title={t.title}
         subtitle={
           <>
-            Read-only view of the active distribution list and recipients. Edits go through SQL in this PR; the management UI ships in PR 004E.
+            {t.subtitle}
             <span className="mx-2">·</span>
-            <a href="/admin" className="underline opacity-90 hover:opacity-100">Back to admin home</a>
+            <a href="/admin" className="underline opacity-90 hover:opacity-100">{t.backToAdmin}</a>
           </>
         }
       />
@@ -43,19 +48,19 @@ export default async function AdminDistributionPage() {
 
       <div className="container mx-auto px-8 py-8 max-w-5xl space-y-6">
         <section className="bg-white border border-gray-200 rounded-sm p-6">
-          <h2 className="font-heading text-xl font-bold text-navy mb-4">All lists</h2>
+          <h2 className="font-heading text-xl font-bold text-navy mb-4">{t.allLists}</h2>
           {lists.length === 0 ? (
-            <div className="text-sm italic text-gray-500">No distribution lists configured.</div>
+            <div className="text-sm italic text-gray-500">{t.noLists}</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                  <th className="text-left pb-2 pr-3 font-medium">List</th>
-                  <th className="text-left pb-2 pr-3 font-medium">Description</th>
-                  <th className="text-right pb-2 pr-3 font-medium">To</th>
-                  <th className="text-right pb-2 pr-3 font-medium">Cc</th>
-                  <th className="text-right pb-2 pr-3 font-medium">Bcc</th>
-                  <th className="text-left pb-2 pr-3 font-medium">Status</th>
+                  <th className="text-left pb-2 pr-3 font-medium">{t.thList}</th>
+                  <th className="text-left pb-2 pr-3 font-medium">{t.thDescription}</th>
+                  <th className="text-right pb-2 pr-3 font-medium">{t.thTo}</th>
+                  <th className="text-right pb-2 pr-3 font-medium">{t.thCc}</th>
+                  <th className="text-right pb-2 pr-3 font-medium">{t.thBcc}</th>
+                  <th className="text-left pb-2 pr-3 font-medium">{t.thStatus}</th>
                 </tr>
               </thead>
               <tbody>
@@ -74,7 +79,7 @@ export default async function AdminDistributionPage() {
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {l.is_active ? "active" : "inactive"}
+                        {l.is_active ? t.active : t.inactive}
                       </span>
                     </td>
                   </tr>
@@ -87,25 +92,24 @@ export default async function AdminDistributionPage() {
         {detail && (
           <section className="bg-white border border-gray-200 rounded-sm p-6">
             <h2 className="font-heading text-xl font-bold text-navy mb-1">
-              Recipients · {detail.name}
+              {t.recipientsTitle(detail.name)}
             </h2>
             <p className="text-xs text-gray-500 mb-4">
-              {detail.recipients.length} total · {detail.active_to_count} active TO ·{" "}
-              {detail.active_cc_count} active CC · {detail.active_bcc_count} active BCC
+              {t.recipientsSummary(detail.recipients.length, detail.active_to_count, detail.active_cc_count, detail.active_bcc_count)}
             </p>
             {detail.recipients.length === 0 ? (
               <div className="text-sm italic text-gray-500 px-4 py-6 text-center bg-gray-50 border border-gray-200 rounded-sm">
-                No active recipients configured. Insert rows into{" "}
-                <code>u1d_ops.board_distribution_recipients</code> to enable sends.
+                {t.noRecipientsPre}{" "}
+                <code>u1d_ops.board_distribution_recipients</code> {t.noRecipientsPost}
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                    <th className="text-left pb-2 pr-3 font-medium">Email</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Display name</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Type</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Status</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thEmail}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thDisplayName}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thType}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thStatus}</th>
                   </tr>
                 </thead>
                 <tbody>

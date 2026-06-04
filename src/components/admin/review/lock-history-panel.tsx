@@ -8,18 +8,20 @@
  * element so the default view stays scannable.
  */
 import type { PeriodLockEventView } from "@/lib/review/period-events-types";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
-function formatLocaleDateTime(iso: string | null): string {
+function formatLocaleDateTime(iso: string | null, locale: Locale): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.valueOf())) return iso;
-  return d.toLocaleString("en-US", {
+  return d.toLocaleString(locale === "es" ? "es-ES" : "en-US", {
     year: "numeric", month: "short", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
 }
 
-function EventBadge({ type }: { type: "locked" | "reopened" }) {
+function EventBadge({ type, label }: { type: "locked" | "reopened"; label: string }) {
   const palette = type === "locked"
     ? "bg-emerald-50 text-emerald-900"
     : "bg-purple-50 text-purple-900";
@@ -27,16 +29,19 @@ function EventBadge({ type }: { type: "locked" | "reopened" }) {
     <span
       className={`inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm ${palette}`}
     >
-      {type}
+      {label}
     </span>
   );
 }
 
-export function LockHistoryPanel({ events }: { events: PeriodLockEventView[] }) {
+export function LockHistoryPanel({ events, locale = "en" }: { events: PeriodLockEventView[]; locale?: Locale }) {
+  const dict = getDict(locale);
+  const t = dict.reviewPanels;
+  const statusLabels = dict.board.status;
   if (events.length === 0) {
     return (
       <div className="text-sm italic text-gray-500 px-4 py-6 text-center bg-gray-50 border border-gray-200 rounded-sm">
-        No lock or reopen events have been recorded for this period yet.
+        {t.lhEmpty}
       </div>
     );
   }
@@ -46,22 +51,22 @@ export function LockHistoryPanel({ events }: { events: PeriodLockEventView[] }) 
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-            <th className="text-left pb-2 pr-3 font-medium">Event</th>
-            <th className="text-left pb-2 pr-3 font-medium">Date / time</th>
-            <th className="text-left pb-2 pr-3 font-medium">By</th>
-            <th className="text-left pb-2 pr-3 font-medium">File / version</th>
-            <th className="text-left pb-2 pr-3 font-medium">Transition</th>
-            <th className="text-left pb-2 pr-3 font-medium">Reason</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thEvent}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thDateTime}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thBy}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thFileVersion}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thTransition}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thReason}</th>
           </tr>
         </thead>
         <tbody>
           {events.map((e) => (
             <tr key={e.event_id} className="border-b border-gray-100 last:border-b-0 align-top">
               <td className="py-2 pr-3 whitespace-nowrap">
-                <EventBadge type={e.event_type} />
+                <EventBadge type={e.event_type} label={statusLabels[e.event_type] ?? e.event_type} />
               </td>
               <td className="py-2 pr-3 tabular-nums text-gray-700 whitespace-nowrap">
-                {formatLocaleDateTime(e.event_at)}
+                {formatLocaleDateTime(e.event_at, locale)}
               </td>
               <td className="py-2 pr-3 text-gray-700 truncate max-w-[220px]" title={e.event_by}>
                 {e.event_by}
@@ -81,7 +86,7 @@ export function LockHistoryPanel({ events }: { events: PeriodLockEventView[] }) 
                   </>
                 ) : e.file_id !== null ? (
                   <span className="text-gray-500 italic">
-                    file_id {e.file_id} (no longer joinable)
+                    {t.fileIdNoJoin(e.file_id)}
                   </span>
                 ) : (
                   <span className="text-gray-400 italic">—</span>
@@ -96,7 +101,7 @@ export function LockHistoryPanel({ events }: { events: PeriodLockEventView[] }) 
                 {e.reason ?? <span className="text-gray-400">—</span>}
                 {e.metadata && Object.keys(e.metadata).length > 0 && (
                   <details className="mt-1 text-[11px] text-gray-500">
-                    <summary className="cursor-pointer select-none">metadata</summary>
+                    <summary className="cursor-pointer select-none">{t.metadata}</summary>
                     <pre className="mt-1 bg-gray-50 border border-gray-200 px-2 py-1 rounded-sm overflow-x-auto">
                       {JSON.stringify(e.metadata, null, 2)}
                     </pre>
@@ -108,9 +113,7 @@ export function LockHistoryPanel({ events }: { events: PeriodLockEventView[] }) 
         </tbody>
       </table>
       <p className="mt-3 text-[11px] text-gray-500 italic">
-        Source: <code>u1d_ops.period_lock_events</code>. Append-only — every
-        lock/reopen action is recorded inside the same transaction as the
-        state transition.
+        {t.lhFooter}
       </p>
     </div>
   );

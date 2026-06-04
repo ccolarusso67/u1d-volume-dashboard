@@ -19,10 +19,13 @@ import {
   formatUploadResponse,
   type Feedback,
 } from "@/lib/upload/format-upload-feedback";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 const ACCEPT = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-export function UploadForm() {
+export function UploadForm({ locale = "en" }: { locale?: Locale }) {
+  const t = getDict(locale).upload;
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -60,7 +63,7 @@ export function UploadForm() {
         // Body wasn't JSON (HTML error page from upstream proxy, network blip).
         body = { error: "non_json_response", message: "Server returned a non-JSON response." };
       }
-      const fb = formatUploadResponse(res.status, body);
+      const fb = formatUploadResponse(res.status, body, locale);
       setFeedback(fb);
 
       if (fb.kind === "success") {
@@ -76,16 +79,16 @@ export function UploadForm() {
       setFeedback({
         kind: "error",
         severity: "error",
-        title: "Network error",
+        title: t.networkErrorTitle,
         body:
           err instanceof Error
-            ? `The upload could not be sent: ${err.message}. Please check your connection and retry.`
-            : "The upload could not be sent. Please check your connection and retry.",
+            ? t.networkErrorBody(err.message)
+            : t.networkErrorBodyGeneric,
       });
     } finally {
       setIsUploading(false);
     }
-  }, [file, isUploading, router]);
+  }, [file, isUploading, router, t]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -94,7 +97,7 @@ export function UploadForm() {
           htmlFor="upload-file"
           className="block text-[11px] uppercase tracking-wider text-gray-500 mb-2"
         >
-          Monthly volume workbook (.xlsx)
+          {t.fileLabel}
         </label>
         <input
           ref={fileInputRef}
@@ -109,8 +112,8 @@ export function UploadForm() {
         />
         {file && (
           <p className="mt-2 text-xs text-gray-500">
-            Selected: <span className="font-medium text-navy">{file.name}</span>{" "}
-            ({(file.size / 1024).toLocaleString("en-US", { maximumFractionDigits: 1 })} KB)
+            {t.selectedPrefix} <span className="font-medium text-navy">{file.name}</span>{" "}
+            ({(file.size / 1024).toLocaleString(locale === "es" ? "es-ES" : "en-US", { maximumFractionDigits: 1 })} KB)
           </p>
         )}
       </div>
@@ -133,11 +136,11 @@ export function UploadForm() {
               <path d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" fill="currentColor" />
             </svg>
           )}
-          {isUploading ? "Uploading…" : "Upload report"}
+          {isUploading ? t.uploading : t.uploadBtn}
         </button>
         {isUploading && (
           <span className="text-xs text-gray-500 italic">
-            Parsing, versioning, persisting — this typically takes a few seconds.
+            {t.parsingNote}
           </span>
         )}
       </div>

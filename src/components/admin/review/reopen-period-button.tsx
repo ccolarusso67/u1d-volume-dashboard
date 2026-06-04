@@ -16,6 +16,8 @@
  */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type State =
   | { phase: "idle" }
@@ -25,20 +27,19 @@ type State =
 export function ReopenPeriodButton({
   year,
   month,
+  locale = "en",
 }: {
   year: number;
   month: number;
+  locale?: Locale;
 }) {
+  const t = getDict(locale).reviewPanels;
   const router = useRouter();
   const [state, setState] = useState<State>({ phase: "idle" });
   const [, startTransition] = useTransition();
 
   async function submit() {
-    const ok = confirm(
-      `Reopen period ${year}-${String(month).padStart(2, "0")}?\n\n` +
-        "The active file version stays in place. Status flips to 'reopened' " +
-        "so the alerts / notes / lock workflow can be re-run."
-    );
+    const ok = confirm(t.reopenConfirm(`${year}-${String(month).padStart(2, "0")}`));
     if (!ok) return;
 
     setState({ phase: "submitting" });
@@ -63,7 +64,7 @@ export function ReopenPeriodButton({
     } catch (err) {
       setState({
         phase: "error",
-        message: err instanceof Error ? err.message : "Network error",
+        message: err instanceof Error ? err.message : t.networkError,
       });
     }
   }
@@ -79,14 +80,14 @@ export function ReopenPeriodButton({
         aria-busy={busy}
         className="bg-white text-amber-900 border border-amber-300 hover:bg-amber-50 text-sm font-medium px-4 py-2 rounded-sm disabled:opacity-50"
       >
-        {busy ? "Reopening…" : "Reopen period"}
+        {busy ? t.reopening : t.reopenPeriod}
       </button>
       {state.phase === "error" && (
         <div
           role="alert"
           className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-sm"
         >
-          Could not reopen: {state.message}
+          {t.couldNotReopen(state.message)}
         </div>
       )}
     </div>

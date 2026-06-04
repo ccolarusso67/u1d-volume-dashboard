@@ -18,6 +18,8 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { UploadForm } from "@/components/admin/upload-form";
 import { UploadHistoryTable } from "@/components/admin/upload-history-table";
 import { listUploadHistory } from "@/lib/upload/list-upload-history";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,9 @@ function getPool(): Pool {
 }
 
 export default async function UploadPage() {
+  const locale = await getLocale();
+  const dict = getDict(locale);
+  const t = dict.upload;
   const session = await auth();
   // Middleware redirects unauthenticated users to /login. This re-check is
   // belt + suspenders, and additionally enforces the admin-only constraint
@@ -57,19 +62,19 @@ export default async function UploadPage() {
   try {
     historyRows = await listUploadHistory(getPool(), 20);
   } catch (err) {
-    historyError = err instanceof Error ? err.message : "Unknown error loading history";
+    historyError = err instanceof Error ? err.message : t.unknownErrorHistory;
   }
 
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Monthly Board Report Upload"
-        subtitle="Upload the latest monthly operating file. The system will parse, version, persist, and flag alerts automatically."
+        eyebrow={dict.common.company}
+        title={t.title}
+        subtitle={t.subtitle}
         meta={
           <>
-            Signed in as {session.user.email}<br />
-            <a href="/admin" className="underline hover:opacity-100 opacity-90">Back to admin home</a>
+            {t.signedInAs(session.user.email)}<br />
+            <a href="/admin" className="underline hover:opacity-100 opacity-90">{t.backToAdmin}</a>
           </>
         }
       />
@@ -78,35 +83,34 @@ export default async function UploadPage() {
       <div className="container mx-auto px-8 py-8 max-w-5xl space-y-8">
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-1">
-            Upload report
+            {t.uploadReport}
           </h2>
           <p className="text-xs text-gray-500 mb-5">
-            Accepts a single <code>.xlsx</code> workbook with the standard SUMMARY
-            sheet layout. Duplicate uploads (same SHA-256) are rejected automatically.
+            {t.uploadReportNote}
           </p>
-          <UploadForm />
+          <UploadForm locale={locale} />
         </section>
 
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <div className="flex items-baseline justify-between mb-1">
             <h2 className="font-heading text-xl font-bold text-navy">
-              Recent uploads
+              {t.recentUploads}
             </h2>
-            <span className="text-xs text-gray-500 italic">Latest 20</span>
+            <span className="text-xs text-gray-500 italic">{t.latest20}</span>
           </div>
           <p className="text-xs text-gray-500 mb-5">
-            Includes superseded versions so audit can trace the full upload history per period.
+            {t.recentNote}
           </p>
           {historyError ? (
             <div
               role="alert"
               className="bg-red-50 border border-red-200 text-red-900 rounded-sm px-4 py-3 text-sm"
             >
-              <div className="font-semibold">Could not load upload history</div>
+              <div className="font-semibold">{t.couldNotLoadHistory}</div>
               <div className="text-xs mt-1 font-mono">{historyError}</div>
             </div>
           ) : (
-            <UploadHistoryTable rows={historyRows} />
+            <UploadHistoryTable rows={historyRows} locale={locale} />
           )}
         </section>
 
@@ -121,7 +125,7 @@ export default async function UploadPage() {
               type="submit"
               className="text-xs text-gray-600 hover:text-navy underline"
             >
-              Sign out
+              {dict.admin.signOut}
             </button>
           </form>
         </section>

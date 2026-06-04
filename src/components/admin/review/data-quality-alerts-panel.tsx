@@ -10,6 +10,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { DataQualityAlert } from "@/lib/review/types";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type RowState =
   | { phase: "idle" }
@@ -25,10 +27,13 @@ const SEVERITY_CLASS: Record<DataQualityAlert["severity"], string> = {
 export function DataQualityAlertsPanel({
   alerts,
   periodLocked,
+  locale = "en",
 }: {
   alerts: DataQualityAlert[];
   periodLocked: boolean;
+  locale?: Locale;
 }) {
+  const t = getDict(locale).reviewPanels;
   const router = useRouter();
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
   const [, startTransition] = useTransition();
@@ -55,7 +60,7 @@ export function DataQualityAlertsPanel({
         ...s,
         [alertId]: {
           phase: "error",
-          message: err instanceof Error ? err.message : "Network error",
+          message: err instanceof Error ? err.message : t.networkError,
         },
       }));
     }
@@ -64,7 +69,7 @@ export function DataQualityAlertsPanel({
   if (alerts.length === 0) {
     return (
       <div className="text-sm italic text-gray-500 px-4 py-6 text-center bg-gray-50 border border-gray-200 rounded-sm">
-        No pending data quality alerts.
+        {t.dqEmpty}
       </div>
     );
   }
@@ -100,7 +105,7 @@ export function DataQualityAlertsPanel({
                 onClick={() => resolve(a.alert_id, "acknowledged")}
                 className="text-xs bg-navy hover:bg-navy-deep text-white px-3 py-1 rounded-sm disabled:opacity-40"
               >
-                Acknowledge
+                {t.acknowledge}
               </button>
               <button
                 type="button"
@@ -108,7 +113,7 @@ export function DataQualityAlertsPanel({
                 onClick={() => resolve(a.alert_id, "ignored")}
                 className="text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1 rounded-sm disabled:opacity-40"
               >
-                Ignore
+                {t.ignoreBtn}
               </button>
               {state.phase === "error" && (
                 <span className="text-[11px] text-red-700 italic ml-2">

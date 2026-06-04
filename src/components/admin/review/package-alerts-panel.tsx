@@ -10,6 +10,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { PackageAlert, PackageOption } from "@/lib/review/types";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type RowState =
   | { phase: "idle" }
@@ -20,11 +22,15 @@ export function PackageAlertsPanel({
   alerts,
   packageOptions,
   periodLocked,
+  locale = "en",
 }: {
   alerts: PackageAlert[];
   packageOptions: PackageOption[];
   periodLocked: boolean;
+  locale?: Locale;
 }) {
+  const t = getDict(locale).reviewPanels;
+  const lcCode = locale === "es" ? "es-ES" : "en-US";
   const router = useRouter();
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
   const [mapTarget, setMapTarget] = useState<Record<number, string>>({});
@@ -33,15 +39,15 @@ export function PackageAlertsPanel({
   async function resolve(alertId: number, action: "ignored" | "mapped") {
     const body: Record<string, unknown> = { action };
     if (action === "mapped") {
-      const t = mapTarget[alertId];
-      if (!t) {
+      const target = mapTarget[alertId];
+      if (!target) {
         setRowState((s) => ({
           ...s,
-          [alertId]: { phase: "error", message: "Choose a package to map to." },
+          [alertId]: { phase: "error", message: t.choosePackageErr },
         }));
         return;
       }
-      body.mapping_target = t;
+      body.mapping_target = target;
     }
     setRowState((s) => ({ ...s, [alertId]: { phase: "submitting" } }));
     try {
@@ -64,14 +70,14 @@ export function PackageAlertsPanel({
         ...s,
         [alertId]: {
           phase: "error",
-          message: err instanceof Error ? err.message : "Network error",
+          message: err instanceof Error ? err.message : t.networkError,
         },
       }));
     }
   }
 
   if (alerts.length === 0) {
-    return <EmptyAlertState label="No pending package alerts." />;
+    return <EmptyAlertState label={t.pkgEmpty} />;
   }
 
   return (
@@ -79,10 +85,10 @@ export function PackageAlertsPanel({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-            <th className="text-left pb-2 pr-3 font-medium">Raw label</th>
-            <th className="text-right pb-2 pr-3 font-medium">Gallons observed</th>
-            <th className="text-left pb-2 pr-3 font-medium">Map to existing package</th>
-            <th className="text-right pb-2 pr-3 font-medium">Actions</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thRawLabel}</th>
+            <th className="text-right pb-2 pr-3 font-medium">{t.thGallonsObserved}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thMapToPackage}</th>
+            <th className="text-right pb-2 pr-3 font-medium">{t.thActions}</th>
           </tr>
         </thead>
         <tbody>
@@ -93,11 +99,11 @@ export function PackageAlertsPanel({
               <tr key={a.alert_id} className="border-b border-gray-100 align-top">
                 <td className="py-2 pr-3 font-medium text-navy">{a.raw_label}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">
-                  {a.gallons_observed.toLocaleString("en-US")}
+                  {a.gallons_observed.toLocaleString(lcCode)}
                 </td>
                 <td className="py-2 pr-3">
                   <select
-                    aria-label={`Map ${a.raw_label} to package`}
+                    aria-label={t.mapAriaPackage(a.raw_label)}
                     disabled={busy}
                     value={mapTarget[a.alert_id] ?? ""}
                     onChange={(e) =>
@@ -105,7 +111,7 @@ export function PackageAlertsPanel({
                     }
                     className="text-sm border border-gray-300 rounded-sm px-2 py-1 bg-white disabled:opacity-50"
                   >
-                    <option value="">— choose package —</option>
+                    <option value="">{t.choosePackage}</option>
                     {packageOptions.map((p) => (
                       <option key={p.package_key} value={p.package_key}>
                         {p.display_name} ({p.family})
@@ -120,7 +126,7 @@ export function PackageAlertsPanel({
                     onClick={() => resolve(a.alert_id, "mapped")}
                     className="text-xs bg-navy hover:bg-navy-deep text-white px-3 py-1 rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Map
+                    {t.mapBtn}
                   </button>
                   <button
                     type="button"
@@ -128,7 +134,7 @@ export function PackageAlertsPanel({
                     onClick={() => resolve(a.alert_id, "ignored")}
                     className="text-xs text-gray-700 border border-gray-300 hover:bg-gray-50 px-3 py-1 rounded-sm ml-2 disabled:opacity-40"
                   >
-                    Ignore
+                    {t.ignoreBtn}
                   </button>
                   {state.phase === "error" && (
                     <div className="mt-1 text-[11px] text-red-700 italic">
@@ -142,9 +148,7 @@ export function PackageAlertsPanel({
         </tbody>
       </table>
       <p className="mt-3 text-[11px] text-gray-500 italic">
-        Creating a brand-new package (PR scope deferred): if the raw label is
-        truly a new product line, ignore it here and add the row to{" "}
-        <code>u1d_ops.packages</code> via a migration before re-uploading.
+        {t.pkgFooter}
       </p>
     </div>
   );

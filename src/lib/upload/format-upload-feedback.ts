@@ -13,6 +13,8 @@
  * fields are pre-formatted strings the UI just renders.
  */
 import type { UploadResult } from "./process-upload";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 export type Feedback = {
   kind: "success" | "error";
@@ -35,13 +37,14 @@ type ErrorBody = {
   period?: unknown;
 };
 
-const MONTHS_EN = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+type UploadDict = ReturnType<typeof getDict>["upload"];
 
-function periodLabel(year: number, month: number): string {
-  const m = MONTHS_EN[month - 1] ?? `Month ${month}`;
+function lc(locale: Locale): "en-US" | "es-ES" {
+  return locale === "es" ? "es-ES" : "en-US";
+}
+
+function periodLabel(year: number, month: number, u: UploadDict): string {
+  const m = u.fbMonthsFull[month - 1] ?? `Month ${month}`;
   return `${m} ${year}`;
 }
 
@@ -61,23 +64,21 @@ function asInt(v: unknown): number | null {
 /**
  * Build feedback for a 200 success response.
  */
-export function formatSuccess(result: UploadResult): Feedback {
-  const label = periodLabel(result.period.year, result.period.month);
+export function formatSuccess(result: UploadResult, locale: Locale = "en"): Feedback {
+  const u = getDict(locale).upload;
+  const code = lc(locale);
+  const label = periodLabel(result.period.year, result.period.month, u);
   const details: string[] = [];
 
   if (result.reused_existing_file) {
-    details.push(
-      `Reused an existing stored file with matching SHA-256 — no duplicate written to disk.`
-    );
+    details.push(u.fbReusedExisting);
   }
-  details.push(`File hash prefix: ${result.file_hash.slice(0, 8)}`);
-  details.push(`Total volume parsed: ${result.total_gallons.toLocaleString("en-US")} gallons.`);
+  details.push(u.fbFileHashPrefix(result.file_hash.slice(0, 8)));
+  details.push(u.fbTotalParsed(result.total_gallons.toLocaleString(code)));
   if (result.has_total_discrepancy) {
     const src = result.source_total_gallons;
     const rec = result.reconstructed_total_gallons;
-    details.push(
-      `Source TOTAL row (${src?.toLocaleString("en-US") ?? "—"}) differs from the reconstructed customer sum (${rec.toLocaleString("en-US")}). A data-quality alert has been opened.`
-    );
+    details.push(u.fbDiscrepancy(src?.toLocaleString(code) ?? "—", rec.toLocaleString(code)));
   }
   const alerts =
     result.package_alert_count +
@@ -85,19 +86,17 @@ export function formatSuccess(result: UploadResult): Feedback {
     result.data_quality_alert_count;
   if (alerts > 0) {
     const parts: string[] = [];
-    if (result.package_alert_count > 0) parts.push(`${result.package_alert_count} package`);
-    if (result.customer_alert_count > 0) parts.push(`${result.customer_alert_count} customer`);
-    if (result.data_quality_alert_count > 0) parts.push(`${result.data_quality_alert_count} data quality`);
-    details.push(
-      `${parts.join(", ")} alert${alerts === 1 ? "" : "s"} created — review pending before this period can be locked.`
-    );
+    if (result.package_alert_count > 0) parts.push(`${result.package_alert_count} ${u.fbAlertPackage}`);
+    if (result.customer_alert_count > 0) parts.push(`${result.customer_alert_count} ${u.fbAlertCustomer}`);
+    if (result.data_quality_alert_count > 0) parts.push(`${result.data_quality_alert_count} ${u.fbAlertDataQuality}`);
+    details.push(u.fbAlertsCreated(parts.join(", "), alerts));
   }
 
   return {
     kind: "success",
     severity: alerts > 0 || result.has_total_discrepancy ? "warn" : "success",
-    title: "Upload completed successfully",
-    body: `The ${label} report was saved as version ${result.version_no}.`,
+    title: u.fbSuccessTitle,
+    body: u.fbSuccessBody(label, result.version_no),
     details,
   };
 }
@@ -111,25 +110,16 @@ export function formatSuccess(result: UploadResult): Feedback {
  *   - Unknown shape falls back to the server-provided `message`, or
  *     a generic message if even that is missing.
  */
-export function formatError(status: number, body: ErrorBody | null): Feedback {
+export function formatError(status: number, body: ErrorBody | null, locale: Locale = "en"): Feedback {
+  const u = getDict(locale).upload;
   const code = typeof body?.error === "string" ? body.error : "";
   const serverMessage = asString(body?.message, "");
 
   switch (status) {
     case 401:
-      return {
-        kind: "error",
-        severity: "error",
-        title: "Sign-in required",
-        body: "Your session has expired. Please sign in again and retry the upload.",
-      };
+      return { kind: "error", severity: "error", title: u.fb401Title, body: u.fb401Body };
     case 403:
-      return {
-        kind: "error",
-        severity: "error",
-        title: "Not authorized",
-        body: "Your account does not have admin permissions for the upload tool. Contact a workspace administrator if you believe this is a mistake.",
-      };
+      return { kind: "error", severity: "error", title: u.fb403Title, body: u.fb403Body };
     case 409: {
       // Duplicate hash — the body includes existing_file_id + period.
       const existingId = asInt(body?.existing_file_id);
@@ -141,82 +131,47 @@ export function formatError(status: number, body: ErrorBody | null): Feedback {
       const month = asInt(period?.month);
       const details: string[] = [];
       if (year !== null && month !== null) {
-        details.push(`Existing upload covers ${periodLabel(year, month)}.`);
+        details.push(u.fb409ExistingCovers(periodLabel(year, month, u)));
       }
       if (existingId !== null) {
-        details.push(`Original file_id: ${existingId}.`);
+        details.push(u.fb409OriginalId(existingId));
       }
       return {
         kind: "error",
         severity: "warn",
-        title: "This file has already been uploaded",
-        body: "No duplicate records were created. If you intended to re-upload a corrected version, please re-export the file from your workbook first so it has a new hash.",
+        title: u.fb409Title,
+        body: u.fb409Body,
         details: details.length ? details : undefined,
       };
     }
     case 413:
-      return {
-        kind: "error",
-        severity: "error",
-        title: "File too large",
-        body: serverMessage || "The selected file exceeds the maximum upload size. Please contact engineering to raise the cap if this is expected.",
-      };
+      return { kind: "error", severity: "error", title: u.fb413Title, body: serverMessage || u.fb413Body };
     case 415:
-      return {
-        kind: "error",
-        severity: "error",
-        title: "Unsupported file type",
-        body: serverMessage || "Only .xlsx workbooks are accepted. Please save your spreadsheet as Excel Workbook (.xlsx) and try again.",
-      };
+      return { kind: "error", severity: "error", title: u.fb415Title, body: serverMessage || u.fb415Body };
     case 422:
       return {
         kind: "error",
         severity: "error",
-        title: "We received the file but could not parse it",
-        body: "The system could not find the expected monthly volume structure. Please confirm the workbook contains a SUMMARY sheet with the standard customer/package layout, and try again.",
-        details: serverMessage ? [`Parser detail: ${serverMessage}`] : undefined,
+        title: u.fb422Title,
+        body: u.fb422Body,
+        details: serverMessage ? [u.fb422Detail(serverMessage)] : undefined,
       };
     case 400:
       switch (code) {
         case "empty_file":
         case "empty_buffer":
-          return {
-            kind: "error",
-            severity: "error",
-            title: "The selected file is empty",
-            body: "Please choose a non-empty .xlsx file and try again.",
-          };
+          return { kind: "error", severity: "error", title: u.fbEmptyTitle, body: u.fbEmptyBody };
         case "missing_file":
         case "invalid_form":
-          return {
-            kind: "error",
-            severity: "error",
-            title: "No file selected",
-            body: "Please choose a file before submitting.",
-          };
+          return { kind: "error", severity: "error", title: u.fbNoFileTitle, body: u.fbNoFileBody };
         case "no_email":
-          return {
-            kind: "error",
-            severity: "error",
-            title: "Session is missing your email",
-            body: "Please sign out and sign in again, then retry.",
-          };
+          return { kind: "error", severity: "error", title: u.fbNoEmailTitle, body: u.fbNoEmailBody };
         default:
-          return {
-            kind: "error",
-            severity: "error",
-            title: "Upload rejected",
-            body: serverMessage || "The request was rejected as invalid. Please review the file and try again.",
-          };
+          return { kind: "error", severity: "error", title: u.fbRejectedTitle, body: serverMessage || u.fbRejectedBody };
       }
     case 500:
     default:
-      return {
-        kind: "error",
-        severity: "error",
-        title: "Unexpected server error",
-        body: serverMessage || "Something went wrong on the server. Please retry in a moment — if the problem persists, contact engineering with a screenshot.",
-      };
+      return { kind: "error", severity: "error", title: u.fb500Title, body: serverMessage || u.fb500Body };
   }
 }
 
@@ -227,10 +182,11 @@ export function formatError(status: number, body: ErrorBody | null): Feedback {
  */
 export function formatUploadResponse(
   status: number,
-  body: unknown
+  body: unknown,
+  locale: Locale = "en"
 ): Feedback {
   if (status >= 200 && status < 300 && body && typeof body === "object" && "file_id" in body) {
-    return formatSuccess(body as UploadResult);
+    return formatSuccess(body as UploadResult, locale);
   }
-  return formatError(status, (body ?? null) as ErrorBody | null);
+  return formatError(status, (body ?? null) as ErrorBody | null, locale);
 }

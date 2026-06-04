@@ -29,6 +29,9 @@ import { DataQualityAlertsPanel } from "@/components/admin/review/data-quality-a
 import { LockPeriodButton } from "@/components/admin/review/lock-period-button";
 import { ReopenPeriodButton } from "@/components/admin/review/reopen-period-button";
 import { LockHistoryPanel } from "@/components/admin/review/lock-history-panel";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 export const dynamic = "force-dynamic";
 
@@ -57,19 +60,19 @@ async function loadCatalogOptions(): Promise<{
   };
 }
 
-function formatLocaleDateTime(iso: string | null): string {
+function formatLocaleDateTime(iso: string | null, locale: Locale): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.valueOf())) return iso;
-  return d.toLocaleString("en-US", {
+  return d.toLocaleString(locale === "es" ? "es-ES" : "en-US", {
     year: "numeric", month: "short", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
 }
 
-function StatusBadge({ status }: { status: BoardPeriodStatus | null }) {
+function StatusBadge({ status, statusLabels, noRow }: { status: BoardPeriodStatus | null; statusLabels: Record<string, string>; noRow: string }) {
   if (!status) {
-    return <span className="text-[10px] uppercase tracking-wider text-gray-400">— no row —</span>;
+    return <span className="text-[10px] uppercase tracking-wider text-gray-400">{noRow}</span>;
   }
   const palette: Record<BoardPeriodStatus, string> = {
     open:       "bg-gray-100 text-gray-700",
@@ -83,12 +86,16 @@ function StatusBadge({ status }: { status: BoardPeriodStatus | null }) {
     <span
       className={`inline-block text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm ${palette[status]}`}
     >
-      {status.replace(/_/g, " ")}
+      {statusLabels[status] ?? status.replace(/_/g, " ")}
     </span>
   );
 }
 
 export default async function ReviewPage({ params }: { params: Promise<Params> }) {
+  const locale = await getLocale();
+  const dict = getDict(locale);
+  const t = dict.review;
+  const statusLabels = dict.board.status;
   const session = await auth();
   if (!session?.user?.email) {
     redirect(`/login?callbackUrl=/admin/review`);
@@ -120,16 +127,16 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
     return (
       <main>
         <HeroHeader
-          eyebrow="U1DYNAMICS MANUFACTURING LLC"
-          title={`Review ${formatPeriod(year, month, "en")}`}
-          subtitle="Could not load review data for this period."
+          eyebrow={dict.common.company}
+          title={t.title(formatPeriod(year, month, locale))}
+          subtitle={t.couldNotLoadSubtitle}
         />
         <Nav current="/admin/review" />
         <div className="container mx-auto px-8 py-8 max-w-3xl">
           <div role="alert" className="bg-red-50 border border-red-200 text-red-900 rounded-sm px-4 py-3 text-sm">
-            <div className="font-semibold">Could not load review data</div>
+            <div className="font-semibold">{t.couldNotLoad}</div>
             <div className="text-xs mt-1 font-mono">
-              {err instanceof Error ? err.message : "Unknown error"}
+              {err instanceof Error ? err.message : t.unknownError}
             </div>
           </div>
         </div>
@@ -142,37 +149,37 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title={`Review ${formatPeriod(year, month, "en")}`}
+        eyebrow={dict.common.company}
+        title={t.title(formatPeriod(year, month, locale))}
         subtitle={
           <>
             {review.period.locked_at
-              ? `Locked at ${formatLocaleDateTime(review.period.locked_at)} by ${review.period.locked_by ?? "—"}`
-              : "Resolve all pending alerts before locking."}
+              ? t.lockedAtBy(formatLocaleDateTime(review.period.locked_at, locale), review.period.locked_by ?? "—")
+              : t.resolveBeforeLock}
             <span className="mx-2">·</span>
-            <a href="/admin/upload" className="underline opacity-90 hover:opacity-100">Back to upload</a>
+            <a href="/admin/upload" className="underline opacity-90 hover:opacity-100">{t.backToUpload}</a>
           </>
         }
-        meta={<StatusBadge status={review.period.status} />}
+        meta={<StatusBadge status={review.period.status} statusLabels={statusLabels} noRow={t.statusNoRow} />}
       />
       <Nav current="/admin/review" />
 
       <div className="container mx-auto px-8 py-8 max-w-6xl space-y-6">
         {/* Summary cards */}
         <section className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <SummaryCard label="Pending packages"        value={fmtNum(review.alertSummary.pendingPackageAlerts)} tone="warn" />
-          <SummaryCard label="Pending customers"        value={fmtNum(review.alertSummary.pendingCustomerAlerts)} tone="warn" />
-          <SummaryCard label="Pending data quality"     value={fmtNum(review.alertSummary.pendingDataQualityAlerts)} tone="warn" />
-          <SummaryCard label="Resolved"                 value={fmtNum(review.alertSummary.resolvedAlerts)} tone="ok" />
-          <SummaryCard label="Total alerts"             value={fmtNum(review.alertSummary.totalAlerts)} tone="neutral" />
+          <SummaryCard label={t.cardPendingPackages}    value={fmtNum(review.alertSummary.pendingPackageAlerts, 0, locale)} tone="warn" />
+          <SummaryCard label={t.cardPendingCustomers}    value={fmtNum(review.alertSummary.pendingCustomerAlerts, 0, locale)} tone="warn" />
+          <SummaryCard label={t.cardPendingDataQuality}  value={fmtNum(review.alertSummary.pendingDataQualityAlerts, 0, locale)} tone="warn" />
+          <SummaryCard label={t.cardResolved}            value={fmtNum(review.alertSummary.resolvedAlerts, 0, locale)} tone="ok" />
+          <SummaryCard label={t.cardTotalAlerts}         value={fmtNum(review.alertSummary.totalAlerts, 0, locale)} tone="neutral" />
           <SummaryCard
-            label="Operator notes"
+            label={t.cardOperatorNotes}
             value={
               review.operatorNotes.is_complete
-                ? "complete"
+                ? t.notesComplete
                 : review.operatorNotes.exists
-                ? "draft"
-                : "missing"
+                ? t.notesDraft
+                : t.notesMissing
             }
             tone={review.operatorNotes.is_complete ? "ok" : "warn"}
           />
@@ -182,12 +189,10 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
         <section className="bg-white border border-gray-200 rounded-sm p-5">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="font-heading text-base font-bold text-navy">Lock period</h2>
+              <h2 className="font-heading text-base font-bold text-navy">{t.lockPeriod}</h2>
               <p className="text-xs text-gray-500 mt-1 max-w-xl">
-                Locking a period sets <code>board_periods.status = 'locked'</code> and
-                marks the active <code>volume_files</code> row with{" "}
-                <code>locked_at</code> / <code>reviewed_at</code>. Locked data is what
-                the board report sources.
+                {t.lockPeriodNotePre} <code>board_periods.status = &apos;locked&apos;</code> {t.lockPeriodNoteMid}{" "}
+                <code>volume_files</code> {t.lockPeriodNotePost}
               </p>
             </div>
             <div className="flex flex-col items-end gap-3">
@@ -195,9 +200,10 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
                 year={year} month={month}
                 canLock={review.canLock}
                 blockedReasons={review.lockBlockedReasons}
+                locale={locale}
               />
               {periodLocked && (
-                <ReopenPeriodButton year={year} month={month} />
+                <ReopenPeriodButton year={year} month={month} locale={locale} />
               )}
             </div>
           </div>
@@ -208,26 +214,21 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-heading text-base font-bold text-navy">
-                Operator notes
+                {t.operatorNotes}
               </h2>
               <p className="text-xs text-gray-500 mt-1 max-w-xl">
-                {review.operatorNotes.is_complete ? (
-                  <>
-                    Marked complete on {formatLocaleDateTime(review.operatorNotes.completed_at)}{" "}
-                    by {review.operatorNotes.completed_by ?? "—"}.
-                  </>
-                ) : review.operatorNotes.exists ? (
-                  <>Draft saved but not yet marked complete. Required before lock.</>
-                ) : (
-                  <>No notes saved yet. Required before lock.</>
-                )}
+                {review.operatorNotes.is_complete
+                  ? t.notesCompleteOn(formatLocaleDateTime(review.operatorNotes.completed_at, locale), review.operatorNotes.completed_by ?? "—")
+                  : review.operatorNotes.exists
+                  ? t.notesDraftNotComplete
+                  : t.noNotesYet}
               </p>
             </div>
             <a
               href={`/admin/operator-notes/${year}/${month}`}
               className="bg-navy hover:bg-navy-deep text-white text-sm font-medium px-4 py-2 rounded-sm transition-colors"
             >
-              {review.operatorNotes.is_complete ? "View notes" : "Open editor"}
+              {review.operatorNotes.is_complete ? t.viewNotes : t.openEditor}
             </a>
           </div>
         </section>
@@ -235,46 +236,46 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
         {/* Lock history */}
         <section className="bg-white border border-gray-200 rounded-sm p-5">
           <h2 className="font-heading text-base font-bold text-navy mb-3">
-            Lock history ({review.periodEvents.length})
+            {t.lockHistory(review.periodEvents.length)}
           </h2>
-          <LockHistoryPanel events={review.periodEvents} />
+          <LockHistoryPanel events={review.periodEvents} locale={locale} />
         </section>
 
         {/* Active file detail */}
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-xl font-bold text-navy mb-3">
-            Active file (v{review.activeFile?.version_no ?? "—"})
+            {t.activeFile(String(review.activeFile?.version_no ?? "—"))}
           </h2>
           {review.activeFile ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <Detail label="Filename" value={review.activeFile.filename} mono />
-              <Detail label="File ID" value={String(review.activeFile.file_id)} />
-              <Detail label="Version" value={`v${review.activeFile.version_no}`} />
-              <Detail label="Uploaded by" value={review.activeFile.uploaded_by} />
-              <Detail label="Uploaded at" value={formatLocaleDateTime(review.activeFile.uploaded_at)} />
-              <Detail label="File hash prefix" value={review.activeFile.file_hash_prefix} mono />
-              <Detail label="Total gallons (reconstructed)" value={fmtNum(review.activeFile.computed_customer_sum)} />
+              <Detail label={t.detailFilename} value={review.activeFile.filename} mono />
+              <Detail label={t.detailFileId} value={String(review.activeFile.file_id)} />
+              <Detail label={t.detailVersion} value={`v${review.activeFile.version_no}`} />
+              <Detail label={t.detailUploadedBy} value={review.activeFile.uploaded_by} />
+              <Detail label={t.detailUploadedAt} value={formatLocaleDateTime(review.activeFile.uploaded_at, locale)} />
+              <Detail label={t.detailHashPrefix} value={review.activeFile.file_hash_prefix} mono />
+              <Detail label={t.detailTotalReconstructed} value={fmtNum(review.activeFile.computed_customer_sum, 0, locale)} />
               <Detail
-                label="Source TOTAL row"
+                label={t.detailSourceTotal}
                 value={
                   review.activeFile.source_total_row !== null
-                    ? fmtNum(review.activeFile.source_total_row)
+                    ? fmtNum(review.activeFile.source_total_row, 0, locale)
                     : "—"
                 }
               />
               <Detail
-                label="Discrepancy"
+                label={t.detailDiscrepancy}
                 value={
                   review.activeFile.has_total_discrepancy
-                    ? `${review.activeFile.discrepancy_amount ?? "?"} gal (flagged)`
-                    : "none"
+                    ? t.discFlagged(String(review.activeFile.discrepancy_amount ?? "?"))
+                    : t.none
                 }
                 tone={review.activeFile.has_total_discrepancy ? "warn" : "ok"}
               />
             </div>
           ) : (
             <div className="text-sm italic text-gray-500">
-              No active uploaded file for this period yet.
+              {t.noActiveFile}
             </div>
           )}
         </section>
@@ -283,18 +284,18 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
         {review.priorVersions.length > 0 && (
           <section className="bg-white border border-gray-200 rounded-sm p-6">
             <h2 className="font-heading text-base font-bold text-navy mb-3">
-              Prior versions ({review.priorVersions.length})
+              {t.priorVersions(review.priorVersions.length)}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                    <th className="text-left pb-2 pr-3 font-medium">Version</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Filename</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Uploaded at</th>
-                    <th className="text-left pb-2 pr-3 font-medium">By</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Hash prefix</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Flags</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thVersion}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thFilename}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thUploadedAt}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thBy}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thHashPrefix}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thFlags}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -305,14 +306,14 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
                         {v.filename}
                       </td>
                       <td className="py-2 pr-3 tabular-nums text-gray-700 whitespace-nowrap">
-                        {formatLocaleDateTime(v.uploaded_at)}
+                        {formatLocaleDateTime(v.uploaded_at, locale)}
                       </td>
                       <td className="py-2 pr-3 text-gray-700">{v.uploaded_by}</td>
                       <td className="py-2 pr-3 font-mono text-gray-700">{v.file_hash_prefix}</td>
                       <td className="py-2 pr-3 text-xs">
                         {v.has_total_discrepancy && (
                           <span className="bg-amber-50 border border-amber-200 text-amber-900 px-1.5 py-0.5 rounded-sm text-[10px] uppercase tracking-wider">
-                            total mismatch
+                            {t.totalMismatch}
                           </span>
                         )}
                       </td>
@@ -327,35 +328,38 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
         {/* Package alerts */}
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-base font-bold text-navy mb-3">
-            Package alerts ({review.alertSummary.pendingPackageAlerts} pending)
+            {t.packageAlertsTitle(review.alertSummary.pendingPackageAlerts)}
           </h2>
           <PackageAlertsPanel
             alerts={review.packageAlerts}
             packageOptions={catalog.packageOptions}
             periodLocked={periodLocked}
+            locale={locale}
           />
         </section>
 
         {/* Customer alerts */}
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-base font-bold text-navy mb-3">
-            Customer alerts ({review.alertSummary.pendingCustomerAlerts} pending)
+            {t.customerAlertsTitle(review.alertSummary.pendingCustomerAlerts)}
           </h2>
           <CustomerAlertsPanel
             alerts={review.customerAlerts}
             customerOptions={catalog.customerOptions}
             periodLocked={periodLocked}
+            locale={locale}
           />
         </section>
 
         {/* Data quality alerts */}
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <h2 className="font-heading text-base font-bold text-navy mb-3">
-            Data quality alerts ({review.alertSummary.pendingDataQualityAlerts} pending)
+            {t.dataQualityAlertsTitle(review.alertSummary.pendingDataQualityAlerts)}
           </h2>
           <DataQualityAlertsPanel
             alerts={review.dataQualityAlerts}
             periodLocked={periodLocked}
+            locale={locale}
           />
         </section>
 
@@ -363,24 +367,24 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
         <section className="bg-white border border-gray-200 rounded-sm p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="font-heading text-base font-bold text-navy">
-              Volume detail (active version)
+              {t.volumeDetail}
             </h2>
             <span className="text-xs text-gray-500 italic">
-              {review.volumeFacts.length} rows
+              {t.rowsLabel(review.volumeFacts.length)}
             </span>
           </div>
           {review.volumeFacts.length === 0 ? (
-            <div className="mt-3 text-sm italic text-gray-500">No volume rows for the active file.</div>
+            <div className="mt-3 text-sm italic text-gray-500">{t.noVolumeRows}</div>
           ) : (
             <div className="overflow-x-auto mt-3">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                    <th className="text-left pb-2 pr-3 font-medium">Customer</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Package</th>
-                    <th className="text-left pb-2 pr-3 font-medium">Family</th>
-                    <th className="text-right pb-2 pr-3 font-medium">Gallons</th>
-                    <th className="text-right pb-2 pr-3 font-medium">Share</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thCustomer}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thPackage}</th>
+                    <th className="text-left pb-2 pr-3 font-medium">{t.thFamily}</th>
+                    <th className="text-right pb-2 pr-3 font-medium">{t.thGallons}</th>
+                    <th className="text-right pb-2 pr-3 font-medium">{t.thShare}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -393,13 +397,13 @@ export default async function ReviewPage({ params }: { params: Promise<Params> }
                         <td className="py-1.5 pr-3 text-navy">
                           {f.customer_display_name}
                           {f.is_intercompany && (
-                            <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">intercomp.</span>
+                            <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">{t.intercompShort}</span>
                           )}
                         </td>
                         <td className="py-1.5 pr-3">{f.package_display_name}</td>
                         <td className="py-1.5 pr-3 text-gray-500 text-xs uppercase tracking-wider">{f.family}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{fmtNum(f.gallons)}</td>
-                        <td className="py-1.5 pr-3 text-right text-gray-500 tabular-nums">{fmtPct(share, 1, false)}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{fmtNum(f.gallons, 0, locale)}</td>
+                        <td className="py-1.5 pr-3 text-right text-gray-500 tabular-nums">{fmtPct(share, 1, false, locale)}</td>
                       </tr>
                     );
                   })}

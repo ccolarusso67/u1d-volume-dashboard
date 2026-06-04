@@ -13,10 +13,14 @@
  *   6. Status (board_periods.status of the row's period)
  *   7. Notes — duplicate/hash indicator + total-discrepancy flag
  */
-import { formatPeriod, fmtNum } from "@/lib/brand";
+import { formatPeriod } from "@/lib/brand";
 import type { UploadHistoryRow } from "@/lib/upload/list-upload-history";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
-function StatusBadge({ status }: { status: UploadHistoryRow["status"] }) {
+type UploadDict = ReturnType<typeof getDict>["upload"];
+
+function StatusBadge({ status, statusLabels }: { status: UploadHistoryRow["status"]; statusLabels: Record<string, string> }) {
   if (!status) {
     return <span className="text-[10px] uppercase tracking-wider text-gray-400">—</span>;
   }
@@ -32,34 +36,33 @@ function StatusBadge({ status }: { status: UploadHistoryRow["status"] }) {
     <span
       className={`inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm ${palette[status]}`}
     >
-      {status.replace(/_/g, " ")}
+      {statusLabels[status] ?? status.replace(/_/g, " ")}
     </span>
   );
 }
 
-function VersionPill({ row }: { row: UploadHistoryRow }) {
+function VersionPill({ row, t }: { row: UploadHistoryRow; t: UploadDict }) {
   if (row.is_superseded) {
     return (
       <span className="text-[11px] text-gray-400 italic">
-        v{row.version_no} (superseded)
+        {t.vSuperseded(row.version_no)}
       </span>
     );
   }
   if (row.is_active) {
     return (
       <span className="inline-block text-[11px] font-semibold text-navy bg-navy/5 border border-navy/20 px-1.5 py-0.5 rounded-sm">
-        v{row.version_no} (active)
+        {t.vActive(row.version_no)}
       </span>
     );
   }
-  return <span className="text-[11px] text-gray-500">v{row.version_no}</span>;
+  return <span className="text-[11px] text-gray-500">{t.vPlain(row.version_no)}</span>;
 }
 
-function formatLocaleDateTime(iso: string): string {
+function formatLocaleDateTime(iso: string, locale: Locale): string {
   const d = new Date(iso);
   if (isNaN(d.valueOf())) return iso;
-  // en-US format, 24-hour for unambiguous reading at a glance.
-  return d.toLocaleString("en-US", {
+  return d.toLocaleString(locale === "es" ? "es-ES" : "en-US", {
     year: "numeric",
     month: "short",
     day: "2-digit",
@@ -69,11 +72,14 @@ function formatLocaleDateTime(iso: string): string {
   });
 }
 
-export function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
+export function UploadHistoryTable({ rows, locale = "en" }: { rows: UploadHistoryRow[]; locale?: Locale }) {
+  const dict = getDict(locale);
+  const t = dict.upload;
+  const statusLabels = dict.board.status;
   if (rows.length === 0) {
     return (
       <div className="text-sm italic text-gray-500 px-4 py-8 text-center bg-gray-50 border border-gray-200 rounded-sm">
-        No uploads yet. The most recent monthly file will appear here once it has been processed.
+        {t.histEmpty}
       </div>
     );
   }
@@ -83,20 +89,20 @@ export function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-            <th className="text-left pb-2 pr-3 font-medium">Uploaded at</th>
-            <th className="text-left pb-2 pr-3 font-medium">Filename</th>
-            <th className="text-left pb-2 pr-3 font-medium">Period</th>
-            <th className="text-left pb-2 pr-3 font-medium">Version</th>
-            <th className="text-left pb-2 pr-3 font-medium">By</th>
-            <th className="text-left pb-2 pr-3 font-medium">Status</th>
-            <th className="text-left pb-2 pr-3 font-medium">Notes</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thUploadedAt}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thFilename}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thPeriod}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thVersion}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thBy}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thStatus}</th>
+            <th className="text-left pb-2 pr-3 font-medium">{t.thNotes}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.file_id} className="border-b border-gray-100 last:border-b-0">
               <td className="py-2 pr-3 tabular-nums whitespace-nowrap text-gray-700">
-                {formatLocaleDateTime(row.uploaded_at)}
+                {formatLocaleDateTime(row.uploaded_at, locale)}
               </td>
               <td className="py-2 pr-3 text-navy truncate max-w-[260px]" title={row.filename}>
                 {row.filename}
@@ -105,19 +111,19 @@ export function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
                 <a
                   href={`/admin/review/${row.period_year}/${row.period_month}`}
                   className="text-navy underline hover:no-underline"
-                  title={`Review ${formatPeriod(row.period_year, row.period_month, "en")}`}
+                  title={formatPeriod(row.period_year, row.period_month, locale)}
                 >
-                  {formatPeriod(row.period_year, row.period_month, "en")}
+                  {formatPeriod(row.period_year, row.period_month, locale)}
                 </a>
               </td>
               <td className="py-2 pr-3 whitespace-nowrap">
-                <VersionPill row={row} />
+                <VersionPill row={row} t={t} />
               </td>
               <td className="py-2 pr-3 truncate max-w-[200px] text-gray-700" title={row.uploaded_by}>
                 {row.uploaded_by}
               </td>
               <td className="py-2 pr-3 whitespace-nowrap">
-                <StatusBadge status={row.status} />
+                <StatusBadge status={row.status} statusLabels={statusLabels} />
               </td>
               <td className="py-2 pr-3 text-xs text-gray-500">
                 <div className="flex flex-wrap gap-2">
@@ -126,7 +132,7 @@ export function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
                   </span>
                   {row.has_total_discrepancy && (
                     <span className="bg-amber-50 border border-amber-200 text-amber-900 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm">
-                      total mismatch
+                      {t.totalMismatch}
                     </span>
                   )}
                 </div>
@@ -136,8 +142,7 @@ export function UploadHistoryTable({ rows }: { rows: UploadHistoryRow[] }) {
         </tbody>
       </table>
       <div className="mt-3 text-xs italic text-gray-500">
-        Showing the latest {rows.length} upload{rows.length === 1 ? "" : "s"}. Source: <code>u1d_ops.volume_files</code> joined to <code>u1d_ops.board_periods</code>.
-        Total volume: {fmtNum(rows.length)} records.
+        {t.histFooter(rows.length)}
       </div>
     </div>
   );
