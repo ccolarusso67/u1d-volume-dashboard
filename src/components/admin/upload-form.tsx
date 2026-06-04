@@ -88,7 +88,7 @@ export function UploadForm({ locale = "en" }: { locale?: Locale }) {
     } finally {
       setIsUploading(false);
     }
-  }, [file, isUploading, router, t]);
+  }, [file, isUploading, router, t, locale]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
