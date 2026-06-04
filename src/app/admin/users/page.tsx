@@ -12,10 +12,15 @@ import { HeroHeader } from "@/components/layout/hero-header";
 import { listUsers } from "@/lib/users/manage-users";
 import { getDailyTargetGallons } from "@/lib/settings/app-settings";
 import { UsersManager } from "@/components/admin/users-manager";
+import { getLocale } from "@/lib/i18n/server";
+import { getDict } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
+  const locale = await getLocale();
+  const d = getDict(locale);
+  const t = d.adminUsers;
   const session = await auth();
   if (!session?.user?.email) {
     redirect("/login?callbackUrl=/admin/users");
@@ -30,9 +35,9 @@ export default async function AdminUsersPage() {
   return (
     <main>
       <HeroHeader
-        eyebrow="U1DYNAMICS MANUFACTURING LLC"
-        title="Users & Access"
-        subtitle="Add board members and admins, set roles, and manage passwords."
+        eyebrow={d.common.company}
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
       />
       <Nav current="/admin" />
       <div className="container mx-auto px-8 py-8 max-w-5xl">
@@ -40,10 +45,10 @@ export default async function AdminUsersPage() {
           initialUsers={users}
           currentEmail={session.user.email}
           initialDailyTarget={dailyTarget}
+          locale={locale}
         />
         <p className="text-xs text-gray-500 italic mt-6">
-          Admins can upload and lock the monthly close; viewers have read-only access.
-          Sign-in requires an active account with a password set here.
+          {t.pageFootnote}
         </p>
       </div>
     </main>

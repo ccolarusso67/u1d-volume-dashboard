@@ -9,6 +9,8 @@
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getDict } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locale";
 
 type ManagedRole = "viewer" | "admin";
 type ManagedUser = {
@@ -21,29 +23,19 @@ type ManagedUser = {
   created_at: string;
 };
 
-const ERR: Record<string, string> = {
-  user_already_exists: "That email already exists.",
-  cannot_demote_self: "You cannot remove your own admin role.",
-  cannot_deactivate_self: "You cannot deactivate your own account.",
-  cannot_delete_self: "You cannot delete your own account.",
-  cannot_clear_own_password: "You cannot clear your own password.",
-  password_too_short: "Password must be at least 8 characters.",
-  invalid_email: "Enter a valid email.",
-  user_not_found: "User not found.",
-  forbidden: "Admin role required.",
-  unauthenticated: "Please sign in again.",
-  internal_error: "Something went wrong. Try again.",
-};
-
 export function UsersManager({
   initialUsers,
   currentEmail,
   initialDailyTarget,
+  locale = "en",
 }: {
   initialUsers: ManagedUser[];
   currentEmail: string;
   initialDailyTarget: number;
+  locale?: Locale;
 }) {
+  const t = getDict(locale).adminUsers;
+  const ERR = t.err;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -68,9 +60,9 @@ export function UsersManager({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        setNotice({ kind: "err", text: "Could not save the daily target." });
+        setNotice({ kind: "err", text: t.couldNotSaveTarget });
       } else {
-        setNotice({ kind: "ok", text: "Daily volume target updated." });
+        setNotice({ kind: "ok", text: t.targetUpdated });
         router.refresh();
       }
     } catch {
@@ -124,11 +116,11 @@ export function UsersManager({
 
       {/* Volume goal setting */}
       <section className="bg-white border border-gray-200 rounded-sm p-5">
-        <h2 className="font-heading text-lg font-bold text-navy mb-3">Volume goal</h2>
+        <h2 className="font-heading text-lg font-bold text-navy mb-3">{t.volumeGoal}</h2>
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Daily target (gallons/day)
+              {t.dailyTargetLabel}
             </label>
             <input
               type="number"
@@ -143,49 +135,47 @@ export function UsersManager({
             onClick={saveDailyTarget}
             className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm px-4 py-2 rounded-sm"
           >
-            Save
+            {t.save}
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-3">
-          Monthly goal = working days that month × this daily target. The delta vs actual
-          volume shows green when met or surpassed, red when below — on the board page,
-          the dashboard, and the deck.
+          {t.volumeGoalNote}
         </p>
       </section>
 
       {/* Add user */}
       <section className="bg-white border border-gray-200 rounded-sm p-5">
-        <h2 className="font-heading text-lg font-bold text-navy mb-3">Add user</h2>
+        <h2 className="font-heading text-lg font-bold text-navy mb-3">{t.addUser}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
           <div className="sm:col-span-5">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t.email}</label>
             <input
               type="email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="person@company.com"
+              placeholder={t.emailPlaceholder}
               className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
             />
           </div>
           <div className="sm:col-span-4">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t.name}</label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Full name"
+              placeholder={t.namePlaceholder}
               className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t.role}</label>
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as ManagedRole)}
               className="w-full border border-gray-300 rounded-sm px-2 py-2 text-sm bg-white"
             >
-              <option value="viewer">viewer</option>
-              <option value="admin">admin</option>
+              <option value="viewer">{t.roleViewer}</option>
+              <option value="admin">{t.roleAdmin}</option>
             </select>
           </div>
           <div className="sm:col-span-1">
@@ -194,7 +184,7 @@ export function UsersManager({
               onClick={async () => {
                 await post(
                   { action: "create", email: newEmail, display_name: newName || null, role: newRole },
-                  "User added."
+                  t.userAdded
                 );
                 setNewEmail("");
                 setNewName("");
@@ -202,12 +192,12 @@ export function UsersManager({
               }}
               className="w-full bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm px-3 py-2 rounded-sm"
             >
-              Add
+              {t.add}
             </button>
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-3">
-          New users start active with no password. Set a password below so they can sign in.
+          {t.addUserNote}
         </p>
       </section>
 
@@ -216,11 +206,11 @@ export function UsersManager({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="text-left px-4 py-2 font-medium">User</th>
-              <th className="text-left px-3 py-2 font-medium">Role</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-left px-3 py-2 font-medium">Password</th>
-              <th className="text-right px-4 py-2 font-medium">Actions</th>
+              <th className="text-left px-4 py-2 font-medium">{t.thUser}</th>
+              <th className="text-left px-3 py-2 font-medium">{t.role}</th>
+              <th className="text-left px-3 py-2 font-medium">{t.thStatus}</th>
+              <th className="text-left px-3 py-2 font-medium">{t.thPassword}</th>
+              <th className="text-right px-4 py-2 font-medium">{t.thActions}</th>
             </tr>
           </thead>
           <tbody>
@@ -233,7 +223,7 @@ export function UsersManager({
                       {u.display_name || u.email}
                       {self && (
                         <span className="ml-2 text-[10px] bg-navy/10 text-navy px-1.5 py-0.5 rounded-sm">
-                          you
+                          {t.you}
                         </span>
                       )}
                     </div>
@@ -248,8 +238,8 @@ export function UsersManager({
                       }
                       className="border border-gray-300 rounded-sm px-2 py-1 text-sm bg-white disabled:opacity-60"
                     >
-                      <option value="viewer">viewer</option>
-                      <option value="admin">admin</option>
+                      <option value="viewer">{t.roleViewer}</option>
+                      <option value="admin">{t.roleAdmin}</option>
                     </select>
                   </td>
                   <td className="px-3 py-3">
@@ -258,7 +248,7 @@ export function UsersManager({
                       onClick={() =>
                         post(
                           { action: "set_active", email: u.email, active: !u.is_active },
-                          u.is_active ? "User deactivated." : "User activated."
+                          u.is_active ? t.userDeactivated : t.userActivated
                         )
                       }
                       className={
@@ -268,7 +258,7 @@ export function UsersManager({
                           : "border-gray-300 text-gray-500 bg-gray-50")
                       }
                     >
-                      {u.is_active ? "Active" : "Inactive"}
+                      {u.is_active ? t.active : t.inactive}
                     </button>
                   </td>
                   <td className="px-3 py-3">
@@ -277,7 +267,7 @@ export function UsersManager({
                         type="password"
                         value={pw[u.email] ?? ""}
                         onChange={(e) => setPw((s) => ({ ...s, [u.email]: e.target.value }))}
-                        placeholder={u.has_password ? "new password" : "set password"}
+                        placeholder={u.has_password ? t.newPasswordPh : t.setPasswordPh}
                         className="w-32 border border-gray-300 rounded-sm px-2 py-1 text-xs"
                       />
                       <button
@@ -285,29 +275,29 @@ export function UsersManager({
                         onClick={async () => {
                           await post(
                             { action: "set_password", email: u.email, password: pw[u.email] },
-                            "Password set."
+                            t.passwordSet
                           );
                           setPw((s) => ({ ...s, [u.email]: "" }));
                         }}
                         className="text-xs bg-navy hover:bg-navy-deep disabled:opacity-50 text-white px-2 py-1 rounded-sm"
                       >
-                        Set
+                        {t.set}
                       </button>
                     </div>
                     <div className="text-[10px] text-gray-400 mt-1">
-                      {u.has_password ? "password set · min 8 chars" : "no password · min 8 chars"}
+                      {u.has_password ? t.pwSetHint : t.pwNoneHint}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       disabled={busy || self}
                       onClick={() => {
-                        if (confirm(`Delete ${u.email}? This cannot be undone.`))
-                          post({ action: "delete", email: u.email }, "User deleted.");
+                        if (confirm(t.deleteConfirm(u.email)))
+                          post({ action: "delete", email: u.email }, t.userDeleted);
                       }}
                       className="text-xs text-red-700 hover:text-red-900 disabled:opacity-40"
                     >
-                      Delete
+                      {t.delete}
                     </button>
                   </td>
                 </tr>
