@@ -15,7 +15,7 @@ export function MixDonut({ data, colors }: { data: MixSlice[]; colors?: string[]
   const colorAt = (i: number) => colors?.[i] ?? MIX_COLORS[i % MIX_COLORS.length];
   return (
     <div style={{ width: "100%", height: 230 }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer width="100%" height={230}>
         <PieChart>
           <Pie
             data={data}

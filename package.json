@@ -11,9 +11,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed:volume": "tsx scripts/seed-volume.ts",
-    "db:seed:production": "tsx scripts/seed-production.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
+    "db:seed:volume": "tsx --env-file-if-exists=.env scripts/seed-volume.ts",
+    "db:seed:production": "tsx --env-file-if-exists=.env scripts/seed-production.ts",
     "db:seed": "npm run db:seed:volume && npm run db:seed:production",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "test": "tsx --test tests/*.test.ts"

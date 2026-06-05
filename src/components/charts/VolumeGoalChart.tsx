@@ -19,7 +19,7 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 export function VolumeGoalChart({ data }: { data: VolumeGoalPoint[] }) {
   return (
     <div style={{ width: "100%", height: 300 }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#EEF1F5" vertical={false} />
           <XAxis

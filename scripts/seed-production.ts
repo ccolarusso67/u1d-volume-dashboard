@@ -87,7 +87,11 @@ async function main() {
     list.push(r);
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const useSsl = /rlwy\.net|railway\.app|[?&]sslmode=/.test(databaseUrl);
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+  });
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
